@@ -13,8 +13,9 @@ Alpha Bot operates entirely locally and acts as an intraday guardian for your sy
 3. **The Volatility Leash (NATR):** Once armed, the bot calculates how much your specific holdings *normally* swing in a day (the NATR). It multiplies this by a baseline factor (e.g., 2.0x) to set a dynamic trailing stop.  
    * *High volatility assets get a wider leash.*  
    * *Low volatility assets get a tighter leash.*  
-4. **The Red Day Defense:** If the market gaps down overnight, the bot automatically switches to a defensive posture, applying a much tighter multiplier (e.g., 0.75x) to cut losses quickly on weak opens.  
-5. **Execution:** If the live return falls below the dynamic trailing stop distance from the High Water Mark, the bot executes a "Sell all to Cash" command via the Composer API and fires a Discord alert.
+4. **The Profit Parachute:** If a symphony goes on a massive run and its intraday peak exceeds its normal daily volatility, the bot automatically begins shrinking the trailing stop multiplier. The higher it flies, the tighter the leash becomes, violently protecting outlier profits.  
+5. **The Red Day Defense:** If the market gaps down overnight, the bot automatically switches to a defensive posture, applying a much tighter multiplier (e.g., 0.75x) to cut losses quickly on weak opens.  
+6. **Execution:** If the live return falls below the dynamic trailing stop distance from the High Water Mark, the bot executes a "Sell all to Cash" command via the Composer API and fires a Discord alert.
 
 ## **🛠️ Prerequisites & Setup**
 
@@ -38,7 +39,8 @@ DISCORD\_WEBHOOK\_URL=\[https://discord.com/api/webhooks/\](https://discord.com/
 TRIGGER\_THRESHOLD\_PCT=15.0  
 ATR\_LOOKBACK\_DAYS=14  
 BASE\_ATR\_MULTIPLIER=2.0  
-RED\_DAY\_ATR\_MULTIPLIER=0.75
+RED\_DAY\_ATR\_MULTIPLIER=0.75  
+MIN\_MULTIPLIER\_FLOOR=0.5
 
 ## **📊 Example Output**
 
@@ -53,49 +55,4 @@ Evaluating Account: a1b2c3d4-xxxx-xxxx
   \-\> Tech Momentum Core: Live Return \= 1.25% | High Water Mark \= 1.25% | Prob Beating \= 42.1%  
   \-\> Copy of Nova Feaver FR: Live Return \= 0.31% | High Water Mark \= 0.31% | Prob Beating \= 14.8%  
   \*\*\* WARNING: Copy of Nova Feaver FR ARMED. Monte Carlo Probability dropped below threshold. \*\*\*  
-  \-\> \[ARMED\] Stop Distance: 2.45% | Current Drawdown: 0.00%
-
-### **Discord Webhook Alert (Execution)**
-
-🚨 **Profit Locked: Trailing Stop Triggered**
-
-**Symphony:** Copy of Nova Feaver FR
-
-**Exit Return:** \-2.14%
-
-**MC Probability:** 12.1%
-
-**Drawdown from Peak:** 2.45%
-
-**Dynamic Stop Level:** 2.45%
-
-**Action Taken:** Executed 'Sell to Cash' via API.
-
-*Alpha Bot • Volatility-Adjusted Trailing Stop*
-
-## **⏰ Automating with Windows 11 Task Scheduler**
-
-Because Alpha Bot needs to actively track the intraday High Water Mark, it should be run continuously throughout the trading day. On Windows 11, you can use Task Scheduler to wake the bot up every 5 minutes while the US market is open.
-
-1. Press the **Windows Key**, type Task Scheduler, and open the application.  
-2. In the right-hand panel, click **Create Task...** (Do *not* click Create Basic Task).  
-3. **General Tab:**  
-   * Name: Alpha Bot Runner  
-   * Check **Run whether user is logged on or not**.  
-4. **Triggers Tab:**  
-   * Click **New...**  
-   * Begin the task: **On a schedule** \-\> **Daily**.  
-   * Set the Start time to exactly market open (e.g., **10:30 PM** JST / 9:30 AM ET).  
-   * Check **Repeat task every:** 5 minutes.  
-   * Set **for a duration of:** 7 hours (This covers the standard trading day, stopping right after the 5:00 AM JST / 4:00 PM ET close).  
-   * Ensure **Enabled** is checked and click OK.  
-5. **Actions Tab:**  
-   * Click **New...**  
-   * Action: **Start a program**  
-   * Program/script: Type python (or paste the direct path to your python.exe if it is not in your system environment variables).  
-   * Add arguments: alpha\_bot.py  
-   * Start in: Paste the full folder path where your script lives (e.g., C:\\Users\\YourName\\Documents\\AlphaBot\\). *Do not put quotes around this path.*  
-6. **Conditions & Settings Tabs:**  
-   * Uncheck "Start the task only if the computer is on AC power" if you are using a laptop.  
-   * Under Settings, check "Allow task to be run on demand" and "Stop the task if it runs longer than 1 hour".  
-7. Click **OK**, enter your Windows password if prompted, and your bot is fully automated\! It will handle its own state resets automatically when the date changes.
+  \-\> \[ARMED\] Stop Distance: 2.45% | Current Drawdown: 0.00%  
