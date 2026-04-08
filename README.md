@@ -17,16 +17,11 @@ The system features a live web dashboard that allows you to monitor the state of
 
 Alpha\_Bot\_Project/  
 ├── .env                    \# API Keys and Algorithm Parameters  
-├── alpha\_bot\_final.py      \# Core Bot Engine (Math, API Calls, Execution)  
+├── alpha\_bot\_final.py    \# Core Bot Engine (Math, API Calls, Execution)  
 ├── app.py                  \# Flask Web Server & Background Scheduler  
-├── bot\_state.json          \# Local memory (High Water Marks, Armed status)  
-├── generate\_report.py      \# Generates end-of-day HTML reports  
-├── report\_template.html    \# Jinja2 template for the daily report  
-├── templates/  
-│   └── index.html          \# Web Dashboard UI  
-└── reports/                \# Auto-generated folder for ledgers and reports  
-    ├── ledger\_YYYY-MM-DD.json  
-    └── report\_YYYY-MM-DD.html
+├── bot\_state.json         \# Local memory (High Water Marks, Armed status)  
+└── templates/  
+    └── index.html          \# Web Dashboard UI
 
 ## **🚀 Installation & Setup**
 
@@ -48,12 +43,16 @@ Alpha\_Bot\_Project/
 
 You can adjust these values directly from the web dashboard by clicking **Edit Variables**. Changes are saved to your .env file and applied on the very next bot execution.
 
-| Variable | Default | Description & Tuning |
-| :---- | :---- | :---- |
+| **Variable** | **Default** | **Description & Tuning** |
+
 | TRIGGER\_THRESHOLD\_PCT | 15.0 | **The "Arming" switch.** The % of Monte Carlo paths needed to beat the current return. *Lower (5.0)* \= Aggressive/Patient. *Higher (25.0)* \= Conservative/Nervous. |
+
 | ATR\_LOOKBACK\_DAYS | 14 | **Volatility memory bank.** Days of history to calculate normal swings. *Lower (7)* \= Hyper-sensitive to recent chop. *Higher (30)* \= Smoother, consistent stops. |
+
 | BASE\_ATR\_MULTIPLIER | 2.0 | **Primary leash.** Multiplies normal volatility to set the stop distance. *Lower (1.25)* \= Tight leash, locks in fast. *Higher (3.0)* \= Diamond hands, ignores noise. |
+
 | RED\_DAY\_ATR\_MULTIPLIER | 0.75 | **Defensive leash.** Used ONLY if SPY opens lower than yesterday's close. *Lower (0.25)* \= Panic button on red days. *Higher (1.5)* \= Gives room for a morning recovery. |
+
 | MIN\_MULTIPLIER\_FLOOR | 0.5 | **Profit Parachute limit.** The tightest the stop is allowed to get when a stock goes parabolic. *Lower (0.1)* \= Strangles outliers instantly. *Higher (2.0)* \= Disables parachute. |
 
 ## **🛠️ How It Works (The Execution Loop)**
