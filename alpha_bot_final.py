@@ -14,12 +14,14 @@ load_dotenv()
 
 COMPOSER_KEY_ID = os.getenv("COMPOSER_KEY_ID")
 COMPOSER_SECRET = os.getenv("COMPOSER_SECRET")
-# Parse comma-separated UUIDs into a list
 ACCOUNT_UUIDS = [uid.strip() for uid in os.getenv("ACCOUNT_UUIDS", "").split(",") if uid.strip()]
 
 ALPACA_KEY = os.getenv("ALPACA_KEY")
 ALPACA_SECRET = os.getenv("ALPACA_SECRET")
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
+
+# --- EXECUTION MODE ---
+LIVE_EXECUTION = os.getenv("LIVE_EXECUTION", "False").lower() in ("true", "1", "yes")
 
 # Algorithm Parameters 
 TRIGGER_THRESHOLD_PCT = float(os.getenv("TRIGGER_THRESHOLD_PCT", "15.0"))
@@ -38,7 +40,6 @@ MIN_MULTIPLIER_FLOOR = float(os.getenv("MIN_MULTIPLIER_FLOOR", "0.5"))
 STATE_FILE = "bot_state.json"
 
 def load_state():
-    """Loads the intraday memory (High Water Marks and Armed Status)."""
     if os.path.exists(STATE_FILE):
         try:
             with open(STATE_FILE, "r") as f:
@@ -48,7 +49,6 @@ def load_state():
     return {}
 
 def save_state(state):
-    """Saves the intraday memory to disk."""
     with open(STATE_FILE, "w") as f:
         json.dump(state, f, indent=4)
 
@@ -64,39 +64,39 @@ def get_composer_headers():
     }
 
 def fetch_symphony_stats(account_id):
-    """Fetches live returns and holdings for all symphonies in an account."""
     url = f"https://api.composer.trade/api/v0.1/portfolio/accounts/{account_id}/symphony-stats-meta"
     response = requests.get(url, headers=get_composer_headers())
-    time.sleep(1.5)  # Strict adherence to Composer's 1 req/sec limit
-    
+    time.sleep(1.5)  
     if response.status_code == 200:
         return response.json().get("symphonies", [])
     print(f"Error fetching account {account_id}: {response.text}")
     return []
 
 def execute_sell_to_cash(symphony_id, account_id):
-    """Triggers the 'Sell all assets, leave proceeds in cash' command."""
     url = f"https://api.composer.trade/api/v0.1/deploy/symphonies/{symphony_id}/sell-all"
     response = requests.post(url, headers=get_composer_headers())
     time.sleep(1.5)
     return response.status_code in [200, 201, 202]
 
-def send_discord_alert(symphony_name, current_return, prob_beating, drawdown, stop_distance):
-    """Sends a rich embedded message to Discord with trailing stop info."""
+def send_discord_alert(symphony_name, current_return, prob_beating, drawdown, stop_distance, is_live):
     if not DISCORD_WEBHOOK_URL:
         return
         
+    title = "🚨 Profit Locked: Trailing Stop Triggered" if is_live else "⚠️ [DRY RUN] Profit Locked"
+    color = 15158332 if is_live else 16766720
+    action_text = "Executed 'Sell to Cash' via API." if is_live else "Bypassed (Dry Run Mode)"
+        
     payload = {
         "embeds": [{
-            "title": "🚨 Profit Locked: Trailing Stop Triggered",
-            "color": 15158332, # Red color for stop out
+            "title": title,
+            "color": color, 
             "fields": [
                 {"name": "Symphony", "value": symphony_name, "inline": True},
                 {"name": "Exit Return", "value": f"{current_return:.2f}%", "inline": True},
                 {"name": "MC Probability", "value": f"{prob_beating:.1f}%", "inline": True},
                 {"name": "Drawdown from Peak", "value": f"{drawdown:.2f}%", "inline": True},
                 {"name": "Dynamic Stop Level", "value": f"{stop_distance:.2f}%", "inline": True},
-                {"name": "Action Taken", "value": "Executed 'Sell to Cash' via API.", "inline": False}
+                {"name": "Action Taken", "value": action_text, "inline": False}
             ],
             "footer": {"text": "Alpha Bot • Volatility-Adjusted Trailing Stop"}
         }]
@@ -104,19 +104,12 @@ def send_discord_alert(symphony_name, current_return, prob_beating, drawdown, st
     requests.post(DISCORD_WEBHOOK_URL, json=payload)
 
 def fetch_alpaca_history(tickers):
-    """Fetches historical daily returns, OHLC data using batching and pagination."""
     print(f"Fetching 3-year history from Alpaca for {len(tickers)} tickers in batches...")
-    
     if "SPY" not in tickers:
         tickers.append("SPY")
         
     start_date = (datetime.now() - timedelta(days=365*3 + 30)).strftime('%Y-%m-%dT00:00:00Z')
-    
-    headers = {
-        "APCA-API-KEY-ID": ALPACA_KEY,
-        "APCA-API-SECRET-KEY": ALPACA_SECRET
-    }
-    
+    headers = {"APCA-API-KEY-ID": ALPACA_KEY, "APCA-API-SECRET-KEY": ALPACA_SECRET}
     historical_data = {}
     batch_size = 30 
     
@@ -126,7 +119,6 @@ def fetch_alpaca_history(tickers):
         print(f"  -> Downloading batch {i//batch_size + 1}: {len(batch)} tickers...")
         
         page_token = None
-        
         while True:
             url = f"https://data.alpaca.markets/v2/stocks/bars?symbols={symbol_string}&timeframe=1Day&start={start_date}&limit=10000&adjustment=split"
             if page_token:
@@ -138,27 +130,19 @@ def fetch_alpaca_history(tickers):
                 break
                 
             data = response.json()
-            
             if "bars" in data:
                 for symbol, bars in data["bars"].items():
                     for j in range(1, len(bars)):
                         prev_close = bars[j-1]['c']
                         curr_close = bars[j]['c']
-                        
                         if prev_close > 0:
                             daily_ret = (curr_close - prev_close) / prev_close
                             date_str = bars[j]['t'][:10]
-                            
                             if date_str not in historical_data:
                                 historical_data[date_str] = {}
-                            
                             historical_data[date_str][symbol] = {
-                                'o': bars[j]['o'],
-                                'h': bars[j]['h'],
-                                'l': bars[j]['l'],
-                                'c': curr_close,
-                                'prev_c': prev_close,
-                                'daily_ret': daily_ret
+                                'o': bars[j]['o'], 'h': bars[j]['h'], 'l': bars[j]['l'],
+                                'c': curr_close, 'prev_c': prev_close, 'daily_ret': daily_ret
                             }
             
             page_token = data.get("next_page_token")
@@ -173,83 +157,60 @@ def fetch_alpaca_history(tickers):
 # ==========================================
 
 def calculate_portfolio_natr(holdings, historical_data, lookback_days=14):
-    """Calculates the Normalized Average True Range (percentage volatility) of the portfolio."""
     valid_dates = sorted(list(historical_data.keys()))[-lookback_days:]
     weighted_natr = 0.0
-    
     for h in holdings:
         ticker = h.get('working_ticker', h.get('ticker'))
         weight = h.get('allocation', 0.0)
-        
         true_ranges = []
         closes = []
-        
         for date in valid_dates:
             data = historical_data[date].get(ticker)
             if data:
-                high = data['h']
-                low = data['l']
-                prev_c = data['prev_c']
-                
+                high, low, prev_c = data['h'], data['l'], data['prev_c']
                 tr = max(high - low, abs(high - prev_c), abs(low - prev_c))
                 true_ranges.append(tr)
                 closes.append(data['c'])
-                
         if true_ranges and closes and closes[-1] > 0:
             avg_tr = sum(true_ranges) / len(true_ranges)
-            current_close = closes[-1]
-            natr_pct = (avg_tr / current_close) * 100 
+            natr_pct = (avg_tr / closes[-1]) * 100 
             weighted_natr += (natr_pct * weight)
-            
     return weighted_natr if weighted_natr > 0 else 1.5 
 
 def run_monte_carlo(holdings, historical_data, spy_today_return):
-    """Runs standard Monte Carlo simulations to find probability of beating current returns."""
     current_symphony_return = sum(
         (h.get('last_percent_change', 0.0) * 100.0) * h.get('allocation', 0.0) 
         for h in holdings if h.get('last_percent_change') is not None
     )
-    
     valid_dates = sorted(list(historical_data.keys())) 
-    
-    if len(valid_dates) < 20:
-        return 100.0 
+    if len(valid_dates) < 20: return 100.0 
 
     distances = []
     for date in valid_dates:
         spy_hist = historical_data[date].get("SPY", {}).get("daily_ret", 0.0)
-        dist = abs(spy_hist - (spy_today_return / 100.0))
-        distances.append((dist, date))
-    
+        distances.append((abs(spy_hist - (spy_today_return / 100.0)), date))
     distances.sort(key=lambda x: x[0])
     nearest_days = [d[1] for d in distances[:NEIGHBOR_K]]
 
     weights = {h['ticker']: h.get('allocation', 0.0) for h in holdings}
-    
     latest_valid_day = valid_dates[-1]
     missing_tickers = [t for t in weights.keys() if t not in historical_data.get(latest_valid_day, {})]
 
     sim_results = np.zeros(SIMULATION_PATHS)
-    
     for i in range(SIMULATION_PATHS):
         random_day = np.random.choice(nearest_days)
         path_return = 0.0
-        
         for ticker, weight in weights.items():
             if ticker in missing_tickers:
                 daily_ret = historical_data[random_day].get("SPY", {}).get("daily_ret", 0.0)
             else:
                 daily_ret = historical_data[random_day].get(ticker, {}).get("daily_ret", 0.0)
-                
             path_return += (daily_ret * 100.0) * weight
-            
         sim_results[i] = path_return
 
     sim_results.sort()
     below_count = np.searchsorted(sim_results, current_symphony_return)
-    prob_beating = ((SIMULATION_PATHS - below_count) / SIMULATION_PATHS) * 100.0
-    
-    return prob_beating
+    return ((SIMULATION_PATHS - below_count) / SIMULATION_PATHS) * 100.0
 
 # ==========================================
 # 5. MAIN EXECUTION LOOP
@@ -257,15 +218,13 @@ def run_monte_carlo(holdings, historical_data, spy_today_return):
 
 def main():
     print(f"[{datetime.now().strftime('%H:%M:%S')}] Alpha Bot Waking Up...")
+    print(f"MODE: {'LIVE EXECUTION (DANGER)' if LIVE_EXECUTION else 'DRY RUN (SAFE)'}")
     
     if not COMPOSER_KEY_ID or not ALPACA_KEY:
         print("CRITICAL: Missing API Keys. Please check your .env file.")
         return
 
-    # 1. Load Local State
     bot_state = load_state()
-    
-    # --- AUTOMATIC DAILY RESET ---
     current_et = datetime.now(timezone.utc) - timedelta(hours=5)
     current_date_str = current_et.strftime('%Y-%m-%d')
     
@@ -273,48 +232,35 @@ def main():
         print(f"  -> New trading day detected ({current_date_str} ET). Wiping old state memory.")
         bot_state = {"date": current_date_str}
         save_state(bot_state)
-    # -----------------------------
 
     all_tickers = set()
     symphony_data_cache = {} 
     
-    # 2. Fetch Symphony data
     for account in ACCOUNT_UUIDS:
         symphonies = fetch_symphony_stats(account)
         symphony_data_cache[account] = symphonies
-        
         for sym in symphonies:
             for holding in sym.get('holdings', []):
                 raw_ticker = holding.get('ticker', '')
                 clean_ticker = raw_ticker.split('::')[-1].split('//')[0]
                 alpaca_ticker = clean_ticker.replace('/', '.')
-                
                 if alpaca_ticker:
                     all_tickers.add(alpaca_ticker)
                     holding['working_ticker'] = alpaca_ticker
                     
-    # 3. Fetch Historical Data 
     historical_data = fetch_alpaca_history(list(all_tickers))
+    if not historical_data: return
     
-    if not historical_data:
-        print("CRITICAL: Failed to retrieve historical data from Alpaca. Aborting execution.")
-        return
-    
-    # 4. Determine Market Tone
     latest_date = sorted(historical_data.keys())[-1]
     latest_spy_data = historical_data[latest_date].get("SPY", {})
     spy_today = latest_spy_data.get("daily_ret", 0.0) * 100 
-    
     spy_open = latest_spy_data.get('o', 1)
     spy_prev_c = latest_spy_data.get('prev_c', 1)
     spy_gap_ret = ((spy_open - spy_prev_c) / spy_prev_c) * 100 if spy_prev_c > 0 else 0.0
-    
     market_tone_red = spy_gap_ret < 0
     
-    print(f"Market Conditioning Baseline (SPY on {latest_date}): {spy_today:.2f}%")
     print(f"Market Open Tone: {'RED' if market_tone_red else 'GREEN'} (Gap: {spy_gap_ret:.2f}%)\n")
 
-    # 5. Evaluate Symphonies
     for account, symphonies in symphony_data_cache.items():
         print(f"Evaluating Account: {account}")
         for sym in symphonies:
@@ -329,7 +275,6 @@ def main():
             if symphony_id not in bot_state:
                 bot_state[symphony_id] = {"high_water_mark": current_return, "armed": False}
 
-            # Update High Water Mark
             if current_return > bot_state[symphony_id]["high_water_mark"]:
                 bot_state[symphony_id]["high_water_mark"] = current_return
 
@@ -337,45 +282,41 @@ def main():
             prob_beating = run_monte_carlo(holdings, historical_data, spy_today)
             print(f"  -> {symphony_name}: Live Return = {current_return:.2f}% | High Water Mark = {high_water_mark:.2f}% | Prob Beating = {prob_beating:.1f}%")
 
-            # --- NEW: Save rich data for the Dashboard ---
             bot_state[symphony_id]["name"] = symphony_name
             bot_state[symphony_id]["account"] = account
             bot_state[symphony_id]["current_return"] = current_return
             bot_state[symphony_id]["mc_prob"] = prob_beating
             save_state(bot_state)
-            # ---------------------------------------------
             
             if prob_beating < TRIGGER_THRESHOLD_PCT and not bot_state[symphony_id]["armed"]:
                 bot_state[symphony_id]["armed"] = True
                 save_state(bot_state)
-                print(f"  *** WARNING: {symphony_name} ARMED. Monte Carlo Probability dropped below threshold. ***")
+                print(f"  *** WARNING: {symphony_name} ARMED. ***")
                 
-            # Execution Logic (Only if Armed)
             if bot_state[symphony_id]["armed"]:
                 active_multiplier = RED_DAY_ATR_MULTIPLIER if market_tone_red else BASE_ATR_MULTIPLIER
                 portfolio_natr = calculate_portfolio_natr(holdings, historical_data, ATR_LOOKBACK_DAYS)
                 
-                # --- PROFIT PARACHUTE LOGIC ---
                 if high_water_mark > portfolio_natr and portfolio_natr > 0:
                     outlier_ratio = high_water_mark / portfolio_natr
                     active_multiplier = max(MIN_MULTIPLIER_FLOOR, active_multiplier / outlier_ratio)
-                # ------------------------------
                 
                 trailing_stop_distance = portfolio_natr * active_multiplier
                 drawdown_from_peak = high_water_mark - current_return
                 
-                print(f"  -> [ARMED] Stop Distance: {trailing_stop_distance:.2f}% | Current Drawdown: {drawdown_from_peak:.2f}%")
-                
                 if drawdown_from_peak >= trailing_stop_distance:
                     print(f"  *** TRAILING STOP HIT FOR {symphony_name} ***")
                     
-                    # EXECUTION TRIGGER - Uncomment the line below to go LIVE
-                    # success = execute_sell_to_cash(symphony_id, account)
-                    print("  -> [DRY RUN] Execution bypassed.")
+                    if LIVE_EXECUTION:
+                        print("  -> [LIVE EXECUTION] Sending sell-to-cash command to Composer API...")
+                        success = execute_sell_to_cash(symphony_id, account)
+                        if not success:
+                            print("     !!! ERROR: Composer API execution failed !!!")
+                    else:
+                        print("  -> [DRY RUN] Execution bypassed.")
                     
-                    send_discord_alert(symphony_name, current_return, prob_beating, drawdown_from_peak, trailing_stop_distance)
+                    send_discord_alert(symphony_name, current_return, prob_beating, drawdown_from_peak, trailing_stop_distance, LIVE_EXECUTION)
                     
-                    # Reset state after selling to prevent spam
                     bot_state[symphony_id]["armed"] = False
                     bot_state[symphony_id]["high_water_mark"] = -999.0
                     save_state(bot_state)
