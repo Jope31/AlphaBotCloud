@@ -1,16 +1,19 @@
 # **Alpha Bot Control Center**
 
-Alpha Bot is an automated trading and risk management system built for Composer.trade. It uses a **Hybrid MC-Armed Fixed Trailing Stop** to protect profits and enforce risk-free trades without overcomplicating execution logic.
+Alpha Bot is an advanced, automated trading and risk management system built for Composer.trade. It uses a **Hybrid MC-Armed Fixed Trailing Stop** to protect profits, cut losses, and enforce risk-free trades without overcomplicating execution logic.
 
-The system features a live web dashboard that allows you to monitor the state of your portfolio across multiple accounts and dynamically adjust your API credentials and algorithmic risk parameters on the fly.
+The system features a live web dashboard that allows you to monitor the state of your portfolio across multiple accounts, dynamically adjust your API credentials and algorithmic risk parameters on the fly, and manually liquidate entire accounts in emergencies.
 
 ## **🌟 Key Features**
 
-* **Live Web Dashboard:** Monitor all symphonies across your Composer accounts (Individual, Roth IRA, Trad. IRA) in real-time.  
+* **Live Web Dashboard:** Monitor all symphonies across your Composer accounts (Individual, Roth IRA, Trad. IRA) in real-time, complete with a live New York clock and countdown timer to the bot's next execution.  
 * **Dual-Arming Mechanism:** The trailing stop activates if the Monte Carlo probability of a positive return drops below your threshold, OR automatically if the symphony dips into the red (below 0.00%) to instantly cap bleeding.  
 * **Hybrid Trailing Stop:** Once armed, the bot follows the symphony's peak with a strict, predictable fixed percentage trailing stop, abandoning complex volatility math.  
 * **Breakeven Lock:** The moment your symphony achieves a specific "Activation %" run, the bot violently yanks the stop level up to 0.00%, mathematically forbidding the trade from closing in the red.  
-* **Post-Market Simulator:** Re-run the day's data with different trailing stops and breakeven locks to see exactly what would have triggered, allowing for perfect tuning.
+* **Account-Wide Liquidation (Panic Button):** A built-in "Go to Cash" button for every account that securely loops through the Composer API and liquidates all symphonies into cash instantly.  
+* **Context-Aware Discord Alerts:** Discord notifications dynamically adapt based on the execution context (e.g., 🟢 "Profit Locked", 🔵 "Breakeven Locked", or 🔴 "Bleed Stopped").  
+* **Smart API Caching:** The bot downloads heavy 3-year historical Alpaca data only *once* per day. Every 5 minutes, it only fetches live intraday SPY data, drastically reducing API load and execution time.  
+* **Post-Market Simulator:** Re-run the day's data with different trailing stops and breakeven locks to see exactly what would have triggered, allowing for perfect algorithmic tuning.
 
 ## **📂 Project Structure**
 
@@ -38,12 +41,13 @@ Alpha\_Bot\_Project/
 4. **Access the Dashboard:**  
    Open your browser and navigate to ```http://localhost:5000```. Click **Edit Variables** to configure your accounts, keys, and risk settings.
 
-## **🔌 Connection Status Indicators**
+## **🔌 UI & Connection Status**
 
 At the top right of your dashboard, you will see a live connection indicator next to the "Force Run Now" button:
 
-* **🟢 System Online (Green Pulse):** Your web browser is successfully communicating with your local Python backend (```app.py```). Your dashboard is actively receiving live data updates every 5 seconds.  
-* **🔴 Disconnected (Red Solid):** Your browser has lost connection to the backend. This almost always means the terminal window running ```app.py``` was closed, stopped, or crashed. The dashboard is now frozen. To fix this, simply restart python app.py in your terminal and the dashboard will reconnect automatically.
+* **🟢 System Online (Green Pulse):** Your web browser is successfully communicating with your local Python backend (app.py). Your dashboard is actively receiving live data updates every 5 seconds.  
+* **🔴 Disconnected (Red Solid):** Your browser has lost connection to the backend. This almost always means the terminal window running app.py was closed, stopped, or crashed. The dashboard is now frozen. To fix this, simply restart python app.py in your terminal.  
+* **Average Return Indicator:** Every account section calculates the live average return of all its symphonies to help you decide when to manually take profits.
 
 ## **⏱️ Scheduling & Manual Triggers**
 
@@ -53,7 +57,7 @@ Once you start ```app.py```, it automatically runs **every 5 minutes**. It inclu
 
 **"Force Run Now" Mechanism**
 
-Clicking the "Force Run Now" button on the dashboard immediately bypasses the timer *and* the Gatekeeper. It executes a live run instantly without interrupting the primary background schedule.
+Clicking the "Force Run Now" button on the dashboard immediately bypasses the countdown timer *and* the Gatekeeper. It executes a live run instantly without interrupting the primary background schedule.
 
 ## **🎛️ Strategy Variables**
 
@@ -66,7 +70,8 @@ Clicking the "Force Run Now" button on the dashboard immediately bypasses the ti
 ## **🛠️ How It Works (The Execution Loop)**
 
 1. **Scheduler:** ```app.py``` triggers ```alpha_bot_execution.py``` every 5 minutes during market hours.  
-2. **Data Fetching:** Retrieves returns from Composer and historical price data from Alpaca.  
-3. **Evaluation:** Updates the local ```bot_state.json``` with the High Water Mark.  
-4. **Arming Check:** Calculates the probability of beating the current return by end-of-day. If below ```TRIGGER_THRESHOLD_PCT``` OR if the return is negative, the symphony is marked "armed": true.  
-5. **Execution:** If Armed, the bot calculates the Stop Level (HWM \- Trailing Stop). It applies the Breakeven lock if necessary. If the Current Return drops below this Stop Level, it executes a sell-all command via the Composer API and sends a Discord alert.
+2. **Data Fetching:** Retrieves live returns from Composer. Loads 3-year historical prices from the local cache, and makes one tiny Alpaca API call to get live SPY data.  
+3. **Evaluation:** Updates the local bot\_state.json with the High Water Mark.  
+4. **Arming Check:** Calculates the probability of beating the current return by end-of-day. If below ```TRIGGER_THRESHOLD_PCT``` OR if the return is negative, the symphony is marked "```ARMED```": true.  
+5. **Execution:** If Armed, the bot calculates the Stop Level (HWM \- Trailing Stop). It applies the Breakeven lock if necessary. If the Current Return drops below this Stop Level, it executes an OpenAPI go-to-cash command via Composer.  
+6. **Triggered Lock:** Once a symphony is sold to cash, it is marked as ```TRIGGERED```. It halts all API execution checks and freezes its UI state until the memory wipes on the next trading day.
