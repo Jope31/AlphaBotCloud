@@ -80,7 +80,7 @@
 
         <div class="bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700 min-h-[750px]">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-semibold text-slate-200">Symphony States by Account</h2>
+                <h2 class="text-xl font-semibold text-slate-200">Symphony Status by Account</h2>
                 <span class="text-xs text-slate-500" id="last-updated">Last Updated: ---</span>
             </div>
             <div id="accounts-container" class="space-y-8"></div>
@@ -196,31 +196,17 @@
                             </div>
                             <div class="relative group">
                                 <div class="flex justify-between items-center mb-1">
-                                    <label class="text-sm font-semibold text-slate-300 flex items-center gap-1.5 cursor-help">ATR_LOOKBACK_DAYS</label>
-                                    <span class="text-xs text-slate-500">Default: 14</span>
+                                    <label class="text-sm font-semibold text-slate-300 flex items-center gap-1.5 cursor-help">TRAILING_STOP_PCT</label>
+                                    <span class="text-xs text-slate-500">Default: 1.5</span>
                                 </div>
-                                <input type="number" step="1" id="env-lookback" required class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                <input type="number" step="0.1" id="env-trailing-stop" required class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                             </div>
                             <div class="relative group">
                                 <div class="flex justify-between items-center mb-1">
-                                    <label class="text-sm font-semibold text-slate-300 flex items-center gap-1.5 cursor-help">BASE_ATR_MULTIPLIER</label>
+                                    <label class="text-sm font-semibold text-slate-300 flex items-center gap-1.5 cursor-help">BREAKEVEN_ACTIVATION_PCT</label>
                                     <span class="text-xs text-slate-500">Default: 2.0</span>
                                 </div>
-                                <input type="number" step="0.1" id="env-base-atr" required class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                            </div>
-                            <div class="relative group">
-                                <div class="flex justify-between items-center mb-1">
-                                    <label class="text-sm font-semibold text-slate-300 flex items-center gap-1.5 cursor-help">RED_DAY_ATR_MULTIPLIER</label>
-                                    <span class="text-xs text-slate-500">Default: 0.75</span>
-                                </div>
-                                <input type="number" step="0.05" id="env-red-atr" required class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                            </div>
-                            <div class="relative group">
-                                <div class="flex justify-between items-center mb-1">
-                                    <label class="text-sm font-semibold text-slate-300 flex items-center gap-1.5 cursor-help">MIN_MULTIPLIER_FLOOR</label>
-                                    <span class="text-xs text-slate-500">Default: 0.5</span>
-                                </div>
-                                <input type="number" step="0.1" id="env-floor" required class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                <input type="number" step="0.1" id="env-breakeven" required class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                             </div>
                         </div>
                     </div>
@@ -251,24 +237,24 @@
             <div class="p-6 bg-slate-800 border-b border-slate-700 shrink-0 grid grid-cols-2 gap-12">
                 <div>
                     <div class="flex justify-between items-center mb-2">
-                        <label class="text-sm font-semibold text-slate-300">Simulated Base Multiplier</label>
-                        <span class="text-lg font-mono text-emerald-400 font-bold" id="sim-base-val">1.50</span>
+                        <label class="text-sm font-semibold text-slate-300">Simulated Trailing Stop (%)</label>
+                        <span class="text-lg font-mono text-emerald-400 font-bold" id="sim-trailing-val">1.50</span>
                     </div>
-                    <input type="range" id="sim-base-slider" min="0.5" max="3.0" step="0.05" value="1.5" class="w-full accent-emerald-500" oninput="runSimulation()">
+                    <input type="range" id="sim-trailing-slider" min="0.1" max="5.0" step="0.1" value="1.5" class="w-full accent-emerald-500" oninput="runSimulation()">
                     <div class="flex justify-between text-[10px] text-slate-400 mt-2 font-medium">
                         <span>← Tighter Leash (Take Profit)</span>
-                        <span>Wider Leash (Diamond Hands) →</span>
+                        <span>Wider Leash (Survive Chop) →</span>
                     </div>
                 </div>
                 <div>
                     <div class="flex justify-between items-center mb-2">
-                        <label class="text-sm font-semibold text-slate-300">Simulated Min Floor (Parachute)</label>
-                        <span class="text-lg font-mono text-emerald-400 font-bold" id="sim-floor-val">0.50</span>
+                        <label class="text-sm font-semibold text-slate-300">Simulated Breakeven Activation (%)</label>
+                        <span class="text-lg font-mono text-emerald-400 font-bold" id="sim-breakeven-val">2.00</span>
                     </div>
-                    <input type="range" id="sim-floor-slider" min="0.1" max="1.5" step="0.05" value="0.5" class="w-full accent-emerald-500" oninput="runSimulation()">
+                    <input type="range" id="sim-breakeven-slider" min="0.5" max="5.0" step="0.1" value="2.0" class="w-full accent-emerald-500" oninput="runSimulation()">
                     <div class="flex justify-between text-[10px] text-slate-400 mt-2 font-medium">
-                        <span>← Quicker Parachute on Outliers</span>
-                        <span>Weaker Parachute →</span>
+                        <span>← Lock Breakeven Faster</span>
+                        <span>Give Winners Room →</span>
                     </div>
                 </div>
             </div>
@@ -283,8 +269,7 @@
                         <tr>
                             <th class="pb-3 font-medium w-1/3">Symphony Name</th>
                             <th class="pb-3 font-medium text-right">Drawdown</th>
-                            <th class="pb-3 font-medium text-right">NATR (Vol)</th>
-                            <th class="pb-3 font-medium text-right">Sim. Stop Dist</th>
+                            <th class="pb-3 font-medium text-right">Sim. Stop Level</th>
                             <th class="pb-3 font-medium text-center">Sim. Result</th>
                         </tr>
                     </thead>
@@ -567,10 +552,8 @@
                 toggleModeUI(toggle);
 
                 document.getElementById('env-trigger').value = vars.TRIGGER_THRESHOLD_PCT;
-                document.getElementById('env-lookback').value = vars.ATR_LOOKBACK_DAYS;
-                document.getElementById('env-base-atr').value = vars.BASE_ATR_MULTIPLIER;
-                document.getElementById('env-red-atr').value = vars.RED_DAY_ATR_MULTIPLIER;
-                document.getElementById('env-floor').value = vars.MIN_MULTIPLIER_FLOOR;
+                document.getElementById('env-trailing-stop').value = vars.TRAILING_STOP_PCT;
+                document.getElementById('env-breakeven').value = vars.BREAKEVEN_ACTIVATION_PCT;
 
                 document.getElementById('env-comp-key').value = vars.COMPOSER_KEY_ID;
                 document.getElementById('env-comp-sec').value = vars.COMPOSER_SECRET;
@@ -619,10 +602,8 @@
                 ACCOUNT_UUIDS: accountsStr,
                 DISCORD_WEBHOOK_URL: document.getElementById('env-discord').value.trim(),
                 TRIGGER_THRESHOLD_PCT: document.getElementById('env-trigger').value,
-                ATR_LOOKBACK_DAYS: document.getElementById('env-lookback').value,
-                BASE_ATR_MULTIPLIER: document.getElementById('env-base-atr').value,
-                RED_DAY_ATR_MULTIPLIER: document.getElementById('env-red-atr').value,
-                MIN_MULTIPLIER_FLOOR: document.getElementById('env-floor').value
+                TRAILING_STOP_PCT: document.getElementById('env-trailing-stop').value,
+                BREAKEVEN_ACTIVATION_PCT: document.getElementById('env-breakeven').value
             };
 
             try {
@@ -658,11 +639,11 @@
                 const response = await fetch('/api/settings');
                 const vars = await response.json();
                 
-                if(vars.BASE_ATR_MULTIPLIER) {
-                    document.getElementById('sim-base-slider').value = vars.BASE_ATR_MULTIPLIER;
+                if(vars.TRAILING_STOP_PCT) {
+                    document.getElementById('sim-trailing-slider').value = vars.TRAILING_STOP_PCT;
                 }
-                if(vars.MIN_MULTIPLIER_FLOOR) {
-                    document.getElementById('sim-floor-slider').value = vars.MIN_MULTIPLIER_FLOOR;
+                if(vars.BREAKEVEN_ACTIVATION_PCT) {
+                    document.getElementById('sim-breakeven-slider').value = vars.BREAKEVEN_ACTIVATION_PCT;
                 }
             } catch (error) {
                 console.error("Failed to load live settings for simulator.", error);
@@ -684,11 +665,11 @@
         }
 
         function runSimulation() {
-            const baseMult = parseFloat(document.getElementById('sim-base-slider').value);
-            const minFloor = parseFloat(document.getElementById('sim-floor-slider').value);
+            const simTrailing = parseFloat(document.getElementById('sim-trailing-slider').value);
+            const simBreakeven = parseFloat(document.getElementById('sim-breakeven-slider').value);
             
-            document.getElementById('sim-base-val').innerText = baseMult.toFixed(2);
-            document.getElementById('sim-floor-val').innerText = minFloor.toFixed(2);
+            document.getElementById('sim-trailing-val').innerText = simTrailing.toFixed(2);
+            document.getElementById('sim-breakeven-val').innerText = simBreakeven.toFixed(2);
 
             let html = '';
             let triggerCount = 0;
@@ -707,16 +688,18 @@
                 const hwm = sym.high_water_mark !== -999.0 ? sym.high_water_mark : sym.current_return;
                 const curRet = sym.current_return !== undefined ? sym.current_return : 0.0;
                 const drawdown = Math.max(0, hwm - curRet);
-                const natr = sym.natr || 1.5;
 
-                let activeMult = baseMult;
-                if (hwm > natr && natr > 0) {
-                    const outlierRatio = hwm / natr;
-                    activeMult = Math.max(minFloor, baseMult / outlierRatio);
+                // Hybrid Fixed Stop & Breakeven Lock Math
+                let baseStopLevel = hwm - simTrailing;
+                let stopLevel = baseStopLevel;
+                
+                if (hwm >= simBreakeven) {
+                    stopLevel = Math.max(baseStopLevel, 0.0);
                 }
                 
-                const stopDist = natr * activeMult;
-                const isTriggered = drawdown >= stopDist && sym.armed;
+                // Simulate Option 3 "Arm on Negative" rule
+                const isSimArmed = sym.armed || curRet < 0.0;
+                const isTriggered = curRet <= stopLevel && isSimArmed;
 
                 if (isTriggered) triggerCount++;
 
@@ -732,9 +715,8 @@
                             <div class="max-w-[350px] truncate" title="${sym.name}">${sym.name}</div>
                         </td>
                         <td class="py-3 text-right font-mono text-slate-300">${drawdown.toFixed(2)}%</td>
-                        <td class="py-3 text-right font-mono text-slate-500">${natr.toFixed(2)}%</td>
-                        <td class="py-3 text-right font-mono font-bold ${isTriggered ? 'text-rose-400' : 'text-emerald-400'}">${stopDist.toFixed(2)}%</td>
-                        <td class="py-3 text-center">${sym.armed ? statusBadge : '<span class="text-slate-600 text-[10px]">UNARMED</span>'}</td>
+                        <td class="py-3 text-right font-mono font-bold ${isTriggered ? 'text-rose-400' : 'text-emerald-400'}">${stopLevel.toFixed(2)}%</td>
+                        <td class="py-3 text-center">${isSimArmed ? statusBadge : '<span class="text-slate-600 text-[10px]">UNARMED</span>'}</td>
                     </tr>
                 `;
             });
