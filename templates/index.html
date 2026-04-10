@@ -383,7 +383,7 @@
 
                 symphonyKeys.forEach(id => {
                     const sym = stateObj[id];
-                    if (sym.armed) armedCount++;
+                    if (sym.armed && !sym.triggered) armedCount++;
                     const accId = sym.account || 'Unknown Account';
                     if (!accountsMap[accId]) accountsMap[accId] = [];
                     accountsMap[accId].push({ id, ...sym });
@@ -444,15 +444,22 @@
 
                     syms.forEach(sym => {
                         const isArmed = sym.armed;
-                        const statusBadge = isArmed 
-                            ? `<span class="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest shadow-[0_0_8px_rgba(245,158,11,0.15)]">ARMED</span>`
-                            : `<span class="bg-slate-800 text-slate-500 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest">STANDBY</span>`;
+                        const isTriggered = sym.triggered;
+                        
+                        let statusBadge = `<span class="bg-slate-800 text-slate-500 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest">STANDBY</span>`;
+                        if (isTriggered) {
+                            statusBadge = `<span class="bg-rose-500/10 text-rose-500 border border-rose-500/20 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest shadow-[0_0_8px_rgba(244,63,94,0.15)]">TRIGGERED</span>`;
+                        } else if (isArmed) {
+                            statusBadge = `<span class="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest shadow-[0_0_8px_rgba(245,158,11,0.15)]">ARMED</span>`;
+                        }
 
                         const name = sym.name || sym.id;
                         const mcProb = sym.mc_prob !== undefined ? `${sym.mc_prob.toFixed(1)}%` : '---';
                         const curRet = sym.current_return !== undefined ? `${sym.current_return.toFixed(2)}%` : '---';
+                        
+                        // If triggered, wipe the stop level and HWM from UI view to prevent weird negative numbers
                         const hwm = sym.high_water_mark !== undefined && sym.high_water_mark !== -999.0 ? `${sym.high_water_mark.toFixed(2)}%` : '---';
-                        const stopLevel = sym.stop_trigger !== undefined ? `${sym.stop_trigger.toFixed(2)}%` : '---';
+                        const stopLevel = sym.stop_trigger !== undefined && sym.stop_trigger !== -999.0 ? `${sym.stop_trigger.toFixed(2)}%` : '---';
                         
                         const mcColor = sym.mc_prob < 15.0 ? 'text-amber-400 font-medium' : 'text-slate-400';
                         const curRetColor = sym.current_return >= 0 ? 'text-emerald-400' : 'text-rose-400';
@@ -714,7 +721,7 @@
                 }
                 
                 // Simulate Option 3 "Arm on Negative" rule
-                const isSimArmed = sym.armed || curRet < 0.0;
+                const isSimArmed = sym.armed || sym.triggered || curRet < 0.0;
                 const isTriggered = curRet <= stopLevel && isSimArmed;
 
                 if (isTriggered) triggerCount++;
