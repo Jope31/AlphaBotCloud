@@ -397,12 +397,28 @@
                     const displayLabel = accountLabels[accId] || "Account";
                     const displayId = accId !== 'Unknown Account' ? `(${accId.substring(0,8)}...)` : '';
 
+                    // Calculate average return across all symphonies in this account
+                    let totalReturn = 0;
+                    if (syms.length > 0) {
+                        const sum = syms.reduce((acc, sym) => acc + (sym.current_return || 0), 0);
+                        totalReturn = sum / syms.length;
+                    }
+                    const totalReturnColor = totalReturn >= 0 ? 'text-emerald-400' : 'text-rose-400';
+                    const totalReturnSign = totalReturn > 0 ? '+' : '';
+                    const totalReturnFormatted = `${totalReturnSign}${totalReturn.toFixed(2)}%`;
+
                     html += `
                     <div class="bg-slate-900 rounded-xl border border-slate-700 overflow-hidden shadow-sm">
                         <div class="px-4 py-3 border-b border-slate-700 bg-slate-800/50 flex justify-between items-center">
                             <span class="text-sm font-semibold text-slate-300">${displayLabel} <span class="text-blue-400 font-mono text-xs ml-1" title="${accId}">${displayId}</span></span>
                             <div class="flex items-center gap-4">
                                 <span class="text-xs text-slate-500">${syms.length} Symphonies</span>
+                                <div class="h-4 w-px bg-slate-700"></div>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Avg Return:</span>
+                                    <span class="text-sm font-mono font-bold ${totalReturnColor}">${totalReturnFormatted}</span>
+                                </div>
+                                <div class="h-4 w-px bg-slate-700"></div>
                                 <button onclick="openConfirmModal('${accId}')" class="text-[11px] bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/30 px-3 py-1.5 rounded transition-colors font-bold tracking-wide flex items-center gap-1.5">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                     GO TO CASH
