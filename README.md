@@ -7,7 +7,7 @@ The system features a live web dashboard that allows you to monitor the state of
 ## **🌟 Key Features**
 
 * **Live Web Dashboard:** Monitor all symphonies across your Composer accounts (Individual, Roth IRA, Trad. IRA) in real-time.  
-* **Monte Carlo "Arming":** Simulates 5,000 potential future paths based on historical Alpaca data. If the probability of beating the current return drops below a threshold, the bot "arms" the trailing stop.  
+* **Dual-Arming Mechanism:** The trailing stop activates if the Monte Carlo probability of a positive return drops below your threshold, OR automatically if the symphony dips into the red (below 0.00%) to instantly cap bleeding.  
 * **Hybrid Trailing Stop:** Once armed, the bot follows the symphony's peak with a strict, predictable fixed percentage trailing stop, abandoning complex volatility math.  
 * **Breakeven Lock:** The moment your symphony achieves a specific "Activation %" run, the bot violently yanks the stop level up to 0.00%, mathematically forbidding the trade from closing in the red.  
 * **Post-Market Simulator:** Re-run the day's data with different trailing stops and breakeven locks to see exactly what would have triggered, allowing for perfect tuning.
@@ -15,12 +15,12 @@ The system features a live web dashboard that allows you to monitor the state of
 ## **📂 Project Structure**
 
 Alpha\_Bot\_Project/  
-├── .env&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp; \# API Keys and Algorithm Parameters  
+├── .env&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp; \# API Keys and Algorithm Parameters  
 ├── alpha\_bot\_execution.py&emsp;\# Core Bot Engine (Math, API Calls, Execution)  
-├── app.py&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;\# Flask Web Server & Background Scheduler  
-├── bot\_state.json&emsp;&emsp;&emsp;\# Local memory (High Water Marks, Armed status)  
+├── app.py&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;\# Flask Web Server & Background Scheduler  
+├── bot\_state.json&emsp;&emsp;&emsp;&emsp;&emsp;\# Local memory (High Water Marks, Armed status)  
 └── templates/  
-&emsp;&emsp;└── index.html&emsp;&emsp;&emsp;\# Web Dashboard UI
+&emsp;&emsp;└── index.html&emsp;&emsp;&emsp;&emsp;&emsp;\# Web Dashboard UI
 
 ## **🚀 Installation & Setup**
 
@@ -59,14 +59,14 @@ Clicking the "Force Run Now" button on the dashboard immediately bypasses the ti
 
 | Variable | Default | Description & Tuning |
 | :---- | :---- | :---- |
-| TRIGGER\_THRESHOLD\_PCT | 15.0 | **The "Arming" switch.** The % of Monte Carlo paths needed to beat the current return. *Lower (5.0)* \= Aggressive/Patient. *Higher (25.0)* \= Conservative/Nervous. |
-| TRAILING\_STOP\_PCT | 1.5 | **The Leash.** Once the symphony is armed, the bot will trail the High Water Mark by this exact percentage. |
-| BREAKEVEN\_ACTIVATION\_PCT | 2.0 | **The Lock.** When the High Water Mark hits this exact percentage, the bot forces the Stop Level to 0.00%, guaranteeing a risk-free trade. |
+| ```TRIGGER_THRESHOLD_PCT``` | 15.0 | **The "Arming" switch.** The % of Monte Carlo paths needed to beat the current return. *Lower (5.0)* \= Aggressive/Patient. *Higher (25.0)* \= Conservative/Nervous. |
+| ```TRAILING_STOP_PCT``` | 1.5 | **The Leash.** Once the symphony is armed, the bot will trail the High Water Mark by this exact percentage. |
+| ```BREAKEVEN_ACTIVATION_PCT``` | 2.0 | **The Lock.** When the High Water Mark hits this exact percentage, the bot forces the Stop Level to 0.00%, guaranteeing a risk-free trade. |
 
 ## **🛠️ How It Works (The Execution Loop)**
 
-1. **Scheduler:** ```app.py``` triggers alpha\_bot\_execution.py every 5 minutes during market hours.  
+1. **Scheduler:** ```app.py``` triggers ```alpha_bot_execution.py``` every 5 minutes during market hours.  
 2. **Data Fetching:** Retrieves returns from Composer and historical price data from Alpaca.  
 3. **Evaluation:** Updates the local ```bot_state.json``` with the High Water Mark.  
-4. **Monte Carlo:** Calculates the probability of beating the current return by end-of-day. If below ```TRIGGER_THRESHOLD_PCT```, the symphony is marked "armed": true.  
+4. **Arming Check:** Calculates the probability of beating the current return by end-of-day. If below ```TRIGGER_THRESHOLD_PCT``` OR if the return is negative, the symphony is marked "armed": true.  
 5. **Execution:** If Armed, the bot calculates the Stop Level (HWM \- Trailing Stop). It applies the Breakeven lock if necessary. If the Current Return drops below this Stop Level, it executes a sell-all command via the Composer API and sends a Discord alert.
