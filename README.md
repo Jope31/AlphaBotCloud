@@ -23,7 +23,9 @@ Alpha\_Bot\_Project/
 ├── app.py&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;\# Flask Web Server & Background Scheduler  
 ├── bot\_state.json&emsp;&emsp;&emsp;&emsp;&emsp;\# Local memory (High Water Marks, Armed status)  
 └── templates/  
-&emsp;&emsp;└── index.html&emsp;&emsp;&emsp;&emsp;&emsp;\# Web Dashboard UI
+&emsp;&emsp;└── index.html&emsp;&emsp;&emsp;&emsp;&emsp;\# Web Dashboard UI<br>
+└── static/<br>
+&emsp;&emsp;└── favicon.png
 
 ## **🚀 Installation & Setup**
 
