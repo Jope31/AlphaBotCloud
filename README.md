@@ -32,7 +32,7 @@ Alpha\_Bot\_Project/
 
 1. **Install Python Dependencies:**  
    Ensure you have Python installed, then open your terminal and run:  
-   ```pip install flask schedule python-dotenv requests numpy```
+   ```pip install flask schedule python-dotenv requests numpy tzdata```
 
 2. **Initial Configuration:**  
    Create an empty ```.env``` file in your root folder (or use your existing one). You can input all your keys directly through the web dashboard once it's running.  
