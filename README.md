@@ -58,7 +58,7 @@ cd AlphaBot
 
 2. **Install requirements:**  
 ```
-pip install -r requirements.txt
+pip install flask requests numpy python-dotenv schedule
 ```
 
    *(Requires: ```flask```, ```requests```, ```numpy```, ```python-dotenv```, ```schedule```)*  
