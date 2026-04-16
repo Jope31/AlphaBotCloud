@@ -85,11 +85,14 @@ def fetch_symphony_stats(account_id):
         f"https://api.composer.trade/api/v0.1/portfolio/accounts/"
         f"{account_id}/symphony-stats-meta"
     )
-    response = requests.get(url, headers=get_composer_headers(), timeout=10)
-    time.sleep(1.5)
-    if response.status_code == 200:
-        return response.json().get("symphonies", [])
-    print(f"Error fetching account {account_id}: {response.text}")
+    try:
+        response = requests.get(url, headers=get_composer_headers(), timeout=15)
+        time.sleep(1.5)
+        if response.status_code == 200:
+            return response.json().get("symphonies", [])
+        print(f"Error fetching account {account_id}: {response.text}")
+    except requests.RequestException as e:
+        print(f"Exception fetching account {account_id}: {e}")
     return []
 
 
@@ -231,9 +234,26 @@ def fetch_alpaca_history(tickers, current_date_str):
             if page_token:
                 url += f"&page_token={page_token}"
 
-            response = requests.get(url, headers=headers, timeout=10)
-            if response.status_code != 200:
-                print(f"Alpaca API Error on batch: {response.text}")
+            max_retries = 3
+            success = False
+            for attempt in range(max_retries):
+                try:
+                    response = requests.get(url, headers=headers, timeout=30)
+                    if response.status_code == 200:
+                        success = True
+                        break
+                    else:
+                        print(
+                            f"Alpaca API Error on batch (attempt {attempt+1}/{max_retries}): HTTP {response.status_code} - {response.text}"
+                        )
+                except requests.RequestException as e:
+                    print(
+                        f"Alpaca API Request Exception (attempt {attempt+1}/{max_retries}): {e}"
+                    )
+                time.sleep(2 * (attempt + 1))
+
+            if not success:
+                print("Failed to download batch after multiple retries.")
                 break
 
             data = response.json()
