@@ -818,16 +818,27 @@
                 const afternoonStop = Math.max(vol * (simAtr * 0.33), simFloor * 0.5);
                 const dynamicStop = morningStop - ((morningStop - afternoonStop) * decayCurve);
 
+                // Evaluate arming dynamically against the sandbox threshold
+                const isSimArmed = (sym.mc_prob !== undefined && sym.mc_prob < simTrigger) || curRet < -0.50;
+
+                // --- NEW STRANGLER LOGIC FOR SIMULATOR ---
+                let activeStopDistance = dynamicStop;
+                if (isSimArmed) {
+                    const safeSimTrigger = simTrigger > 0 ? simTrigger : 0.1; // Prevent division by zero
+                    const mcHealthRatio = Math.max(0.0, Math.min(1.0, (sym.mc_prob || 0) / safeSimTrigger));
+                    const MAX_SQUEEZE_FLOOR = 0.20;
+                    const strangleMultiplier = MAX_SQUEEZE_FLOOR + (mcHealthRatio * (1.0 - MAX_SQUEEZE_FLOOR));
+                    activeStopDistance = dynamicStop * strangleMultiplier;
+                }
+
                 // Use the newly calculated logarithmic stop from the scrubber
-                let baseStopLevel = hwm - dynamicStop;
+                let baseStopLevel = hwm - activeStopDistance;
                 let stopLevel = baseStopLevel;
                 
                 if (hwm >= simBreakeven) {
                     stopLevel = Math.max(baseStopLevel, 0.0);
                 }
                 
-                // Evaluate arming dynamically against the sandbox threshold
-                const isSimArmed = (sym.mc_prob !== undefined && sym.mc_prob < simTrigger) || curRet < -0.50;
                 const isTriggered = curRet <= stopLevel && isSimArmed;
 
                 if (isTriggered) triggerCount++;
@@ -844,7 +855,7 @@
                             <div class="max-w-[350px] truncate" title="${sym.name}">${sym.name}</div>
                         </td>
                         <td class="py-3 text-right font-mono text-slate-300">${drawdown.toFixed(2)}%</td>
-                        <td class="py-3 text-right font-mono text-slate-400">${dynamicStop.toFixed(2)}%</td>
+                        <td class="py-3 text-right font-mono text-slate-400">${activeStopDistance.toFixed(2)}%</td>
                         <td class="py-3 text-right font-mono font-bold ${isTriggered ? 'text-rose-400' : 'text-emerald-400'}">${stopLevel.toFixed(2)}%</td>
                         <td class="py-3 text-center">${isSimArmed ? statusBadge : '<span class="text-slate-600 text-[10px]">UNARMED</span>'}</td>
                     </tr>
