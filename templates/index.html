@@ -181,7 +181,6 @@
                         <div class="mt-5">
                             <label class="text-xs font-semibold text-slate-300 mb-1 block">Discord Server Webhook (Optional)</label>
                             <input type="text" id="env-discord" placeholder="https://discord.com/api/webhooks/..." class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                            <a href="https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks" target="_blank" class="text-[10px] text-blue-400 hover:text-blue-300 transition-colors mt-1 inline-block">How do I create a webhook?</a>
                         </div>
                     </div>
 
@@ -191,7 +190,14 @@
                         <div class="space-y-4">
                             <div class="relative group">
                                 <div class="flex justify-between items-center mb-1">
-                                    <label class="text-sm font-semibold text-slate-300 flex items-center gap-1.5 cursor-help">TRIGGER_THRESHOLD_PCT</label>
+                                    <label class="text-sm font-semibold text-fuchsia-400 flex items-center gap-1.5 cursor-help" title="When MC Probability dips below this threshold, arm a take-profit trap.">TAKE_PROFIT_MC_PCT (Smart TP)</label>
+                                    <span class="text-xs text-slate-500">Default: 5.0</span>
+                                </div>
+                                <input type="number" step="0.1" id="env-tp-mc" required class="w-full bg-slate-900 border border-fuchsia-600/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-fuchsia-500 focus:ring-1 focus:ring-fuchsia-500">
+                            </div>
+                            <div class="relative group">
+                                <div class="flex justify-between items-center mb-1">
+                                    <label class="text-sm font-semibold text-slate-300 flex items-center gap-1.5 cursor-help" title="When MC Probability dips below this threshold, arm the trailing stop.">TRIGGER_THRESHOLD_PCT (Trailing Stop)</label>
                                     <span class="text-xs text-slate-500">Default: 15.0</span>
                                 </div>
                                 <input type="number" step="0.1" id="env-trigger" required class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
@@ -265,38 +271,45 @@
             </div>
 
             <!-- Parameters Grid -->
-            <div class="p-6 bg-slate-800 border-b border-slate-700 shrink-0 grid grid-cols-2 md:grid-cols-5 gap-6">
+            <div class="p-6 bg-slate-800 border-b border-slate-700 shrink-0 grid grid-cols-2 md:grid-cols-6 gap-4">
                 <div>
                     <div class="flex justify-between items-center mb-2">
-                        <label class="text-xs font-semibold text-slate-300">ATR Multiplier</label>
+                        <label class="text-xs font-semibold text-slate-300">ATR Mult.</label>
                         <span class="text-sm font-mono text-emerald-400 font-bold" id="sim-atr-val">2.00</span>
                     </div>
                     <input type="range" id="sim-atr-slider" min="0.5" max="5.0" step="0.1" value="2.0" class="w-full accent-emerald-500" oninput="runSimulation()">
                 </div>
                 <div>
                     <div class="flex justify-between items-center mb-2">
-                        <label class="text-xs font-semibold text-slate-300">Min Stop Floor</label>
+                        <label class="text-xs font-semibold text-slate-300">Min Floor</label>
                         <span class="text-sm font-mono text-emerald-400 font-bold" id="sim-floor-val">0.50</span>
                     </div>
                     <input type="range" id="sim-floor-slider" min="0.1" max="2.0" step="0.1" value="0.5" class="w-full accent-emerald-500" oninput="runSimulation()">
                 </div>
                 <div>
                     <div class="flex justify-between items-center mb-2">
-                        <label class="text-xs font-semibold text-slate-300">Breakeven Act.</label>
+                        <label class="text-xs font-semibold text-slate-300">Breakeven</label>
                         <span class="text-sm font-mono text-emerald-400 font-bold" id="sim-breakeven-val">2.00</span>
                     </div>
                     <input type="range" id="sim-breakeven-slider" min="0.5" max="5.0" step="0.1" value="2.0" class="w-full accent-emerald-500" oninput="runSimulation()">
                 </div>
                 <div>
                     <div class="flex justify-between items-center mb-2">
-                        <label class="text-xs font-semibold text-slate-300">MC Trigger Thr.</label>
+                        <label class="text-xs font-semibold text-slate-300">Stop MC Thr.</label>
                         <span class="text-sm font-mono text-amber-400 font-bold" id="sim-trigger-val">15.0</span>
                     </div>
                     <input type="range" id="sim-trigger-slider" min="0.0" max="50.0" step="1.0" value="15.0" class="w-full accent-amber-500" oninput="runSimulation()">
                 </div>
                 <div>
                     <div class="flex justify-between items-center mb-2">
-                        <label class="text-xs font-semibold text-slate-300">MC Squeeze Fl.</label>
+                        <label class="text-xs font-semibold text-slate-300">TP MC Thr.</label>
+                        <span class="text-sm font-mono text-fuchsia-400 font-bold" id="sim-tpmc-val">5.0</span>
+                    </div>
+                    <input type="range" id="sim-tpmc-slider" min="0.0" max="25.0" step="1.0" value="5.0" class="w-full accent-fuchsia-500" oninput="runSimulation()">
+                </div>
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="text-xs font-semibold text-slate-300">Stop Sqz Fl.</label>
                         <span class="text-sm font-mono text-amber-400 font-bold" id="sim-squeeze-val">0.20</span>
                     </div>
                     <input type="range" id="sim-squeeze-slider" min="0.05" max="1.0" step="0.05" value="0.20" class="w-full accent-amber-500" oninput="runSimulation()">
@@ -483,7 +496,7 @@
 
                 symphonyKeys.forEach(id => {
                     const sym = stateObj[id];
-                    if (sym.armed && !sym.triggered) armedCount++;
+                    if ((sym.armed || sym.tp_armed) && !sym.triggered) armedCount++;
                     const accId = sym.account || 'Unknown Account';
                     if (!accountsMap[accId]) accountsMap[accId] = [];
                     accountsMap[accId].push({ id, ...sym });
@@ -544,18 +557,21 @@
 
                     syms.forEach(sym => {
                         const isArmed = sym.armed;
+                        const isTpArmed = sym.tp_armed;
                         const isTriggered = sym.triggered;
 
                         let statusBadge = `<span class="bg-slate-800 text-slate-500 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest">STANDBY</span>`;
                         if (isTriggered) {
                             statusBadge = `<span class="bg-rose-500/10 text-rose-500 border border-rose-500/20 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest shadow-[0_0_8px_rgba(244,63,94,0.15)]">TRIGGERED</span>`;
+                        } else if (isTpArmed) {
+                            statusBadge = `<span class="bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest shadow-[0_0_8px_rgba(217,70,239,0.15)]" title="Smart Take-Profit is Armed">TP-ARMED</span>`;
                         } else if (isArmed) {
                             statusBadge = `<span class="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest shadow-[0_0_8px_rgba(245,158,11,0.15)]">ARMED</span>`;
                         }
 
                         const name = sym.name || sym.id;
                         const mcProb = sym.mc_prob !== undefined ? `${sym.mc_prob.toFixed(1)}%` : '---';
-                        const mcColor = sym.mc_prob < 15.0 ? 'text-amber-400 font-medium' : 'text-slate-400';
+                        const mcColor = isTpArmed ? 'text-fuchsia-400 font-bold' : (sym.mc_prob < 15.0 ? 'text-amber-400 font-medium' : 'text-slate-400');
 
                         let curRetStr = '---';
                         let hwmStr = '---';
@@ -703,6 +719,7 @@
                 toggle.checked = isLive;
                 toggleModeUI(toggle);
 
+                document.getElementById('env-tp-mc').value = vars.TAKE_PROFIT_MC_PCT || 5.0;
                 document.getElementById('env-trigger').value = vars.TRIGGER_THRESHOLD_PCT || 15.0;
                 document.getElementById('env-squeeze-floor').value = vars.MAX_SQUEEZE_FLOOR || 0.20;
                 document.getElementById('env-atr').value = vars.BASE_ATR_MULTIPLIER || 2.0;
@@ -757,6 +774,7 @@
                 ALPACA_SECRET: document.getElementById('env-alp-sec').value.trim(),
                 ACCOUNT_UUIDS: accountsStr,
                 DISCORD_WEBHOOK_URL: document.getElementById('env-discord').value.trim(),
+                TAKE_PROFIT_MC_PCT: document.getElementById('env-tp-mc').value,
                 TRIGGER_THRESHOLD_PCT: document.getElementById('env-trigger').value,
                 MAX_SQUEEZE_FLOOR: document.getElementById('env-squeeze-floor').value,
                 BASE_ATR_MULTIPLIER: document.getElementById('env-atr').value,
@@ -804,6 +822,7 @@
                 if(vars.BREAKEVEN_ACTIVATION_PCT) document.getElementById('sim-breakeven-slider').value = vars.BREAKEVEN_ACTIVATION_PCT;
                 if(vars.TRIGGER_THRESHOLD_PCT) document.getElementById('sim-trigger-slider').value = vars.TRIGGER_THRESHOLD_PCT;
                 if(vars.MAX_SQUEEZE_FLOOR) document.getElementById('sim-squeeze-slider').value = vars.MAX_SQUEEZE_FLOOR;
+                if(vars.TAKE_PROFIT_MC_PCT) document.getElementById('sim-tpmc-slider').value = vars.TAKE_PROFIT_MC_PCT;
 
             } catch (error) {
                 console.error("Failed to load live settings for simulator.", error);
@@ -847,6 +866,7 @@
             const simBreakeven = parseFloat(document.getElementById('sim-breakeven-slider').value);
             const simTrigger = parseFloat(document.getElementById('sim-trigger-slider').value);
             const simSqueeze = parseFloat(document.getElementById('sim-squeeze-slider').value);
+            const simTpMc = parseFloat(document.getElementById('sim-tpmc-slider').value);
             
             const simMinutes = parseInt(document.getElementById('sim-time-slider').value);
             const simRunUp = parseFloat(document.getElementById('sim-runup-slider').value);
@@ -858,6 +878,7 @@
             document.getElementById('sim-breakeven-val').innerText = simBreakeven.toFixed(2);
             document.getElementById('sim-trigger-val').innerText = simTrigger.toFixed(1);
             document.getElementById('sim-squeeze-val').innerText = simSqueeze.toFixed(2);
+            document.getElementById('sim-tpmc-val').innerText = simTpMc.toFixed(1);
             
             document.getElementById('sim-time-val').innerText = formatTimeLabel(simMinutes);
             document.getElementById('sim-runup-val').innerText = `+${simRunUp.toFixed(1)}%`;
@@ -902,6 +923,7 @@
 
                 // Arming logic (uses simulated return so a big enough drop automatically arms it)
                 let isSimArmed = (sym.mc_prob !== undefined && sym.mc_prob < simTrigger) || simCurRet < -0.50;
+                let isSimTpArmed = (sym.mc_prob !== undefined && sym.mc_prob < simTpMc);
                 if (forceArm) isSimArmed = true;
 
                 // Strangler logic
@@ -930,6 +952,8 @@
                 let statusBadge = `<span class="text-slate-500 text-[10px] font-bold tracking-widest">UNARMED</span>`;
                 if (isTriggered) {
                     statusBadge = `<span class="bg-rose-500/20 text-rose-400 border border-rose-500/30 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest shadow-[0_0_8px_rgba(244,63,94,0.2)]">TRIGGERED</span>`;
+                } else if (isSimTpArmed) {
+                    statusBadge = `<span class="bg-fuchsia-500/20 text-fuchsia-400 border border-fuchsia-500/30 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest shadow-[0_0_8px_rgba(217,70,239,0.2)]">TP-ARMED</span>`;
                 } else if (isSimArmed) {
                     statusBadge = `<span class="bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest shadow-[0_0_8px_rgba(245,158,11,0.2)]">ARMED</span>`;
                 }
