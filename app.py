@@ -9,6 +9,7 @@ from datetime import datetime
 import schedule
 import requests
 from flask import Flask, render_template, jsonify, request
+from alpha_bot_execution import get_composer_headers
 from dotenv import dotenv_values, set_key, find_dotenv
 
 app = Flask(__name__)
@@ -117,11 +118,7 @@ def manual_trigger():
 # --- 4. Account Liquidation Route ---
 def perform_account_liquidation(account_id, key, secret, live_mode):
     """Performs account liquidation via the Composer API."""
-    headers = {
-        "x-api-key-id": key,
-        "authorization": f"Bearer {secret}",
-        "Content-Type": "application/json",
-    }
+    headers = get_composer_headers(key=key, secret=secret)
     url = (
         f"https://api.composer.trade/api/v0.1/portfolio/accounts/"
         f"{account_id}/symphony-stats-meta"

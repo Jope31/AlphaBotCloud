@@ -70,13 +70,18 @@ def save_state(state):
 # ==========================================
 # 3. API CONNECTORS & RATE LIMIT HANDLING
 # ==========================================
-def get_composer_headers():
+def get_composer_headers(key=None, secret=None):
     """Returns headers required for the Composer API."""
     return {
-        "x-api-key-id": COMPOSER_KEY_ID,
-        "authorization": f"Bearer {COMPOSER_SECRET}",
+        "x-api-key-id": key or COMPOSER_KEY_ID,
+        "authorization": f"Bearer {secret or COMPOSER_SECRET}",
         "Content-Type": "application/json",
     }
+
+
+def get_alpaca_headers():
+    """Returns headers required for the Alpaca API."""
+    return {"APCA-API-KEY-ID": ALPACA_KEY, "APCA-API-SECRET-KEY": ALPACA_SECRET}
 
 
 def fetch_symphony_stats(account_id):
@@ -213,7 +218,7 @@ def fetch_alpaca_history(tickers, current_date_str):
     start_date = (datetime.now() - timedelta(days=365 * 3 + 30)).strftime(
         "%Y-%m-%dT00:00:00Z"
     )
-    headers = {"APCA-API-KEY-ID": ALPACA_KEY, "APCA-API-SECRET-KEY": ALPACA_SECRET}
+    headers = get_alpaca_headers()
     historical_data = {}
     batch_size = 30
 
@@ -296,7 +301,7 @@ def fetch_alpaca_history(tickers, current_date_str):
 def get_live_spy_data():
     """Fetches the latest SPY return data."""
     start_date = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%dT00:00:00Z")
-    headers = {"APCA-API-KEY-ID": ALPACA_KEY, "APCA-API-SECRET-KEY": ALPACA_SECRET}
+    headers = get_alpaca_headers()
     url = (
         f"https://data.alpaca.markets/v2/stocks/bars?"
         f"symbols=SPY&timeframe=1Day&start={start_date}&limit=10"
