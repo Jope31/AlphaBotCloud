@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AlphaBot Dashboard</title>
+    <title>Alpha Bot Dashboard</title>
     <!-- Add Favicon -->
     <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -55,7 +55,7 @@
             <div class="w-1/3 flex flex-col items-end gap-3">
                 <div class="flex items-center gap-4">
                     <div class="flex flex-col items-center justify-center">
-                        <span id="countdown-text" class="text-[10px] text-slate-400 font-mono tracking-widest font-bold mb-1">NEXT RUN: --:--</span>
+                        <span id="countdown-text" class="text-[10px] text-slate-400 font-mono tracking-widest font-bold mb-1" title="Runs every 1-minute during market hours for multi-tick confirmations.">NEXT RUN: --:--</span>
                         <div class="flex items-center gap-2 px-3 py-1 bg-slate-900 rounded-full border border-slate-700">
                             <div id="status-indicator" class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
                             <span id="status-text" class="text-xs font-medium text-slate-300">System Online</span>
@@ -204,6 +204,13 @@
                             </div>
                             <div class="relative group">
                                 <div class="flex justify-between items-center mb-1">
+                                    <label class="text-sm font-semibold text-rose-400 flex items-center gap-1.5 cursor-help" title="Vol-Scaled Minimum Floor. Drops below max(LOSS_ARM_PCT, Daily_Vol) will instantly arm the trailing stop.">LOSS_ARM_PCT (Flash Crash)</label>
+                                    <span class="text-xs text-slate-500">Default: 1.5</span>
+                                </div>
+                                <input type="number" step="0.1" id="env-loss-arm" required class="w-full bg-slate-900 border border-rose-600/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500">
+                            </div>
+                            <div class="relative group">
+                                <div class="flex justify-between items-center mb-1">
                                     <label class="text-sm font-semibold text-slate-300 flex items-center gap-1.5 cursor-help">MAX_SQUEEZE_FLOOR</label>
                                     <span class="text-xs text-slate-500">Default: 0.20</span>
                                 </div>
@@ -239,10 +246,10 @@
                             </div>
                             <div class="relative group">
                                 <div class="flex justify-between items-center mb-1">
-                                    <label class="text-sm font-semibold text-slate-300 flex items-center gap-1.5 cursor-help">BREAKEVEN_ACTIVATION_PCT</label>
+                                    <label class="text-sm font-semibold text-blue-300 flex items-center gap-1.5 cursor-help" title="Vol-Scaled Breakeven Floor. Locks stop at 0.0% once HWM exceeds max(BREAKEVEN_ACTIVATION_PCT, Daily_Vol).">BREAKEVEN_ACTIVATION_PCT</label>
                                     <span class="text-xs text-slate-500">Default: 2.0</span>
                                 </div>
-                                <input type="number" step="0.1" id="env-breakeven" required class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                <input type="number" step="0.1" id="env-breakeven" required class="w-full bg-slate-900 border border-blue-600/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                             </div>
                         </div>
                     </div>
@@ -263,7 +270,7 @@
             <div class="px-6 py-4 border-b border-slate-700 flex justify-between items-center bg-slate-900 shrink-0">
                 <h3 class="text-lg font-bold text-white flex items-center gap-2">
                     <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
-                    Post-Market Sandbox & Stress Test
+                    Post-Market Sandbox <span class="ml-2 text-xs text-rose-400 font-normal bg-rose-950/40 border border-rose-900/50 px-2 py-0.5 rounded-full">*Assumes 2-Tick Confirmations instantly met</span>
                 </h3>
                 <button onclick="closeSimulatorModal()" class="text-slate-400 hover:text-white transition-colors">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -271,45 +278,52 @@
             </div>
 
             <!-- Parameters Grid -->
-            <div class="p-6 bg-slate-800 border-b border-slate-700 shrink-0 grid grid-cols-2 md:grid-cols-6 gap-4">
+            <div class="p-6 bg-slate-800 border-b border-slate-700 shrink-0 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
                 <div>
                     <div class="flex justify-between items-center mb-2">
-                        <label class="text-xs font-semibold text-slate-300">ATR Mult.</label>
+                        <label class="text-[10px] font-semibold text-slate-300">ATR Mult.</label>
                         <span class="text-sm font-mono text-emerald-400 font-bold" id="sim-atr-val">2.00</span>
                     </div>
                     <input type="range" id="sim-atr-slider" min="0.5" max="5.0" step="0.1" value="2.0" class="w-full accent-emerald-500" oninput="runSimulation()">
                 </div>
                 <div>
                     <div class="flex justify-between items-center mb-2">
-                        <label class="text-xs font-semibold text-slate-300">Min Floor</label>
+                        <label class="text-[10px] font-semibold text-slate-300">Min Floor</label>
                         <span class="text-sm font-mono text-emerald-400 font-bold" id="sim-floor-val">0.50</span>
                     </div>
                     <input type="range" id="sim-floor-slider" min="0.1" max="2.0" step="0.1" value="0.5" class="w-full accent-emerald-500" oninput="runSimulation()">
                 </div>
                 <div>
                     <div class="flex justify-between items-center mb-2">
-                        <label class="text-xs font-semibold text-slate-300">Breakeven</label>
+                        <label class="text-[10px] font-semibold text-slate-300">Breakeven</label>
                         <span class="text-sm font-mono text-emerald-400 font-bold" id="sim-breakeven-val">2.00</span>
                     </div>
                     <input type="range" id="sim-breakeven-slider" min="0.5" max="5.0" step="0.1" value="2.0" class="w-full accent-emerald-500" oninput="runSimulation()">
                 </div>
                 <div>
                     <div class="flex justify-between items-center mb-2">
-                        <label class="text-xs font-semibold text-slate-300">Stop MC Thr.</label>
+                        <label class="text-[10px] font-semibold text-slate-300">Stop MC Thr.</label>
                         <span class="text-sm font-mono text-amber-400 font-bold" id="sim-trigger-val">15.0</span>
                     </div>
                     <input type="range" id="sim-trigger-slider" min="0.0" max="50.0" step="1.0" value="15.0" class="w-full accent-amber-500" oninput="runSimulation()">
                 </div>
                 <div>
                     <div class="flex justify-between items-center mb-2">
-                        <label class="text-xs font-semibold text-slate-300">TP MC Thr.</label>
+                        <label class="text-[10px] font-semibold text-slate-300">TP MC Thr.</label>
                         <span class="text-sm font-mono text-fuchsia-400 font-bold" id="sim-tpmc-val">5.0</span>
                     </div>
                     <input type="range" id="sim-tpmc-slider" min="0.0" max="25.0" step="1.0" value="5.0" class="w-full accent-fuchsia-500" oninput="runSimulation()">
                 </div>
                 <div>
                     <div class="flex justify-between items-center mb-2">
-                        <label class="text-xs font-semibold text-slate-300">Stop Sqz Fl.</label>
+                        <label class="text-[10px] font-semibold text-slate-300">Loss Arm Fl.</label>
+                        <span class="text-sm font-mono text-rose-400 font-bold" id="sim-loss-val">1.50</span>
+                    </div>
+                    <input type="range" id="sim-loss-slider" min="0.5" max="5.0" step="0.1" value="1.5" class="w-full accent-rose-500" oninput="runSimulation()">
+                </div>
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="text-[10px] font-semibold text-slate-300">Stop Sqz Fl.</label>
                         <span class="text-sm font-mono text-amber-400 font-bold" id="sim-squeeze-val">0.20</span>
                     </div>
                     <input type="range" id="sim-squeeze-slider" min="0.05" max="1.0" step="0.05" value="0.20" class="w-full accent-amber-500" oninput="runSimulation()">
@@ -323,9 +337,9 @@
                         <label class="text-xs font-semibold text-slate-400 uppercase tracking-widest">Time of Day (Logarithmic Squeeze)</label>
                         <span class="text-sm font-mono text-blue-400 font-bold bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20" id="sim-time-val">4:00 PM</span>
                     </div>
-                    <input type="range" id="sim-time-slider" min="0" max="370" step="1" value="370" class="w-full accent-blue-500" oninput="runSimulation()">
+                    <input type="range" id="sim-time-slider" min="0" max="330" step="1" value="330" class="w-full accent-blue-500" oninput="runSimulation()">
                     <div class="flex justify-between text-[10px] text-slate-500 font-mono mt-1 font-bold">
-                        <span>9:50 AM</span>
+                        <span>10:30 AM</span>
                         <span>4:00 PM</span>
                     </div>
                 </div>
@@ -559,14 +573,18 @@
                         const isArmed = sym.armed;
                         const isTpArmed = sym.tp_armed;
                         const isTriggered = sym.triggered;
+                        const belowStopCount = sym.below_stop_count || 0;
+                        const aboveTpCount = sym.above_tp_count || 0;
 
                         let statusBadge = `<span class="bg-slate-800 text-slate-500 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest">STANDBY</span>`;
                         if (isTriggered) {
                             statusBadge = `<span class="bg-rose-500/10 text-rose-500 border border-rose-500/20 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest shadow-[0_0_8px_rgba(244,63,94,0.15)]">TRIGGERED</span>`;
                         } else if (isTpArmed) {
-                            statusBadge = `<span class="bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest shadow-[0_0_8px_rgba(217,70,239,0.15)]" title="Smart Take-Profit is Armed">TP-ARMED</span>`;
+                            let confirmBadge = aboveTpCount === 1 ? `<span class="ml-1 text-[9px] animate-pulse">(1/2 Ticks)</span>` : ``;
+                            statusBadge = `<span class="bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest shadow-[0_0_8px_rgba(217,70,239,0.15)]" title="Smart Take-Profit is Armed">TP-ARMED${confirmBadge}</span>`;
                         } else if (isArmed) {
-                            statusBadge = `<span class="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest shadow-[0_0_8px_rgba(245,158,11,0.15)]">ARMED</span>`;
+                            let confirmBadge = belowStopCount === 1 ? `<span class="ml-1 text-[9px] animate-pulse">(1/2 Ticks)</span>` : ``;
+                            statusBadge = `<span class="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest shadow-[0_0_8px_rgba(245,158,11,0.15)]">ARMED${confirmBadge}</span>`;
                         }
 
                         const name = sym.name || sym.id;
@@ -578,6 +596,7 @@
                         let stopLevelStr = '---';
                         let curRetColor = 'text-slate-400';
                         let hwmColor = 'text-slate-400';
+                        let isLocked = sym.breakeven_locked;
 
                         // Check if it's triggered. If so, display the frozen variables instead of the live ones.
                         if (isTriggered) {
@@ -606,8 +625,9 @@
 
                             hwmStr = sym.high_water_mark !== undefined && sym.high_water_mark !== -999.0 ? `${sym.high_water_mark.toFixed(2)}%` : '---';
                             hwmColor = sym.high_water_mark > 0 ? 'text-emerald-400' : 'text-slate-300';
-
-                            stopLevelStr = sym.stop_trigger !== undefined && sym.stop_trigger !== -999.0 ? `${sym.stop_trigger.toFixed(2)}%` : '---';
+                            
+                            let lockIcon = isLocked ? `<span class="opacity-70 text-[10px] mr-1 text-blue-400" title="Vol-Scaled Breakeven Lock Active">🔒</span>` : ``;
+                            stopLevelStr = sym.stop_trigger !== undefined && sym.stop_trigger !== -999.0 ? `${lockIcon}${sym.stop_trigger.toFixed(2)}%` : '---';
                         }
 
                         html += `
@@ -721,6 +741,7 @@
 
                 document.getElementById('env-tp-mc').value = vars.TAKE_PROFIT_MC_PCT || 5.0;
                 document.getElementById('env-trigger').value = vars.TRIGGER_THRESHOLD_PCT || 15.0;
+                document.getElementById('env-loss-arm').value = vars.LOSS_ARM_PCT || 1.5;
                 document.getElementById('env-squeeze-floor').value = vars.MAX_SQUEEZE_FLOOR || 0.20;
                 document.getElementById('env-atr').value = vars.BASE_ATR_MULTIPLIER || 2.0;
                 document.getElementById('env-floor').value = vars.MIN_MULTIPLIER_FLOOR || 0.5;
@@ -776,6 +797,7 @@
                 DISCORD_WEBHOOK_URL: document.getElementById('env-discord').value.trim(),
                 TAKE_PROFIT_MC_PCT: document.getElementById('env-tp-mc').value,
                 TRIGGER_THRESHOLD_PCT: document.getElementById('env-trigger').value,
+                LOSS_ARM_PCT: document.getElementById('env-loss-arm').value,
                 MAX_SQUEEZE_FLOOR: document.getElementById('env-squeeze-floor').value,
                 BASE_ATR_MULTIPLIER: document.getElementById('env-atr').value,
                 MIN_MULTIPLIER_FLOOR: document.getElementById('env-floor').value,
@@ -823,13 +845,14 @@
                 if(vars.TRIGGER_THRESHOLD_PCT) document.getElementById('sim-trigger-slider').value = vars.TRIGGER_THRESHOLD_PCT;
                 if(vars.MAX_SQUEEZE_FLOOR) document.getElementById('sim-squeeze-slider').value = vars.MAX_SQUEEZE_FLOOR;
                 if(vars.TAKE_PROFIT_MC_PCT) document.getElementById('sim-tpmc-slider').value = vars.TAKE_PROFIT_MC_PCT;
+                if(vars.LOSS_ARM_PCT) document.getElementById('sim-loss-slider').value = vars.LOSS_ARM_PCT;
 
             } catch (error) {
                 console.error("Failed to load live settings for simulator.", error);
             }
 
             // Defaults
-            document.getElementById('sim-time-slider').value = 370; // EOD
+            document.getElementById('sim-time-slider').value = 330; // EOD (from 10:30)
             document.getElementById('sim-runup-slider').value = 0.0; 
             document.getElementById('sim-pullback-slider').value = 0.0;
             document.getElementById('sim-force-arm').checked = true;
@@ -850,8 +873,8 @@
         }
 
         function formatTimeLabel(minutesFromOpen) {
-            // Reflects the 9:50 AM open grace period
-            const totalMinutes = 9 * 60 + 50 + parseInt(minutesFromOpen);
+            // Reflects the new 10:30 AM open grace period
+            const totalMinutes = 10 * 60 + 30 + parseInt(minutesFromOpen);
             const hours = Math.floor(totalMinutes / 60);
             const mins = totalMinutes % 60;
             const ampm = hours >= 12 ? 'PM' : 'AM';
@@ -867,6 +890,7 @@
             const simTrigger = parseFloat(document.getElementById('sim-trigger-slider').value);
             const simSqueeze = parseFloat(document.getElementById('sim-squeeze-slider').value);
             const simTpMc = parseFloat(document.getElementById('sim-tpmc-slider').value);
+            const simLossArm = parseFloat(document.getElementById('sim-loss-slider').value);
             
             const simMinutes = parseInt(document.getElementById('sim-time-slider').value);
             const simRunUp = parseFloat(document.getElementById('sim-runup-slider').value);
@@ -879,13 +903,14 @@
             document.getElementById('sim-trigger-val').innerText = simTrigger.toFixed(1);
             document.getElementById('sim-squeeze-val').innerText = simSqueeze.toFixed(2);
             document.getElementById('sim-tpmc-val').innerText = simTpMc.toFixed(1);
+            document.getElementById('sim-loss-val').innerText = simLossArm.toFixed(2);
             
             document.getElementById('sim-time-val').innerText = formatTimeLabel(simMinutes);
             document.getElementById('sim-runup-val').innerText = `+${simRunUp.toFixed(1)}%`;
             document.getElementById('sim-pullback-val').innerText = `${simPullback.toFixed(1)}%`;
 
             // Calculate Decay Curve
-            const timeRatio = Math.max(0.0, Math.min(1.0, simMinutes / 370.0));
+            const timeRatio = Math.max(0.0, Math.min(1.0, simMinutes / 330.0));
             const decayCurve = Math.log10(1 + 9 * timeRatio);
 
             let html = '';
@@ -921,15 +946,19 @@
                 const afternoonStop = Math.max(vol * (simAtr * 0.33), simFloor * 0.5);
                 const dynamicStop = morningStop - ((morningStop - afternoonStop) * decayCurve);
 
-                // Arming logic (uses simulated return so a big enough drop automatically arms it)
-                let isSimArmed = (sym.mc_prob !== undefined && sym.mc_prob < simTrigger) || simCurRet < -0.50;
+                // Flash Crash Fix applied to simulation
+                const effectiveLossThreshold = Math.max(simLossArm, vol);
+                const effectiveBreakeven = Math.max(simBreakeven, vol);
+
+                // Arming logic
+                let isSimArmed = (sym.mc_prob !== undefined && sym.mc_prob < simTrigger && sym.mc_prob >= simTpMc) || simCurRet < -effectiveLossThreshold;
                 let isSimTpArmed = (sym.mc_prob !== undefined && sym.mc_prob < simTpMc);
                 if (forceArm) isSimArmed = true;
 
                 // Strangler logic
                 let activeStopDistance = dynamicStop;
                 if (isSimArmed) {
-                    const safeSimTrigger = simTrigger > 0 ? simTrigger : 0.1; // Prevent div by zero
+                    const safeSimTrigger = simTrigger > 0 ? simTrigger : 0.1; 
                     const mcHealthRatio = Math.max(0.0, Math.min(1.0, (sym.mc_prob || 0) / safeSimTrigger));
                     const strangleMultiplier = simSqueeze + (mcHealthRatio * (1.0 - simSqueeze));
                     activeStopDistance = dynamicStop * strangleMultiplier;
@@ -939,7 +968,7 @@
                 let baseStopLevel = hwm - activeStopDistance;
                 let stopLevel = baseStopLevel;
 
-                if (hwm >= simBreakeven) {
+                if (hwm >= effectiveBreakeven) {
                     stopLevel = Math.max(baseStopLevel, 0.0);
                 }
 
