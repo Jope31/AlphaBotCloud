@@ -282,7 +282,7 @@
             </div>
 
             <!-- Custom Legend -->
-            <div class="px-6 py-4 border-t border-slate-700 bg-slate-800 shrink-0 flex items-center justify-center gap-8">
+            <div class="px-6 py-4 border-t border-slate-700 bg-slate-800 shrink-0 flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
                 <div class="flex items-center gap-2">
                     <div class="w-4 h-1 bg-emerald-500 rounded"></div>
                     <span class="text-xs font-semibold text-slate-300">Current Return</span>
@@ -290,6 +290,10 @@
                 <div class="flex items-center gap-2">
                     <div class="w-4 h-1 border-t-2 border-dashed border-orange-500"></div>
                     <span class="text-xs font-semibold text-slate-300">Trailing Stop Floor</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 bg-blue-500/30 border border-blue-500/50 rounded-[1px]"></div>
+                    <span class="text-xs font-semibold text-slate-300" title="Monte Carlo Engine Output. Lower bars squeeze the stop tighter.">MC Probability (Engine)</span>
                 </div>
                 <div class="flex items-center gap-2">
                     <div class="w-3 h-3 bg-amber-500 clip-triangle"></div>
@@ -657,9 +661,17 @@
 
                             const fStop = sym.triggered_at_stop !== undefined ? sym.triggered_at_stop : sym.stop_trigger;
 
-                            // Format Frozen Return (with padlock)
-                            curRetStr = `<span class="opacity-70 text-[10px] mr-1" title="Frozen Exit Return">🔒</span>${fRet > 0 ? '+' : ''}${fRet.toFixed(2)}%`;
-                            curRetColor = fRet >= 0 ? 'text-emerald-500' : 'text-rose-500';
+                            // Format Frozen Return (with timestamp and padlock)
+                            const triggerTime = sym.triggered_at_time ? sym.triggered_at_time + ' ET' : '--:--';
+                            curRetStr = `<div class="flex flex-col items-end leading-tight">
+                                            <span class="${fRet >= 0 ? 'text-emerald-500' : 'text-rose-500'}" title="Frozen Exit Return">
+                                                ${fRet > 0 ? '+' : ''}${fRet.toFixed(2)}%
+                                            </span>
+                                            <span class="text-[10px] text-slate-500 font-bold mt-0.5 flex items-center gap-1" title="Time of Execution">
+                                                <span class="opacity-70 text-[9px]">🔒</span>${triggerTime}
+                                            </span>
+                                         </div>`;
+                            curRetColor = ''; // Reset outer color to allow div inner styling
 
                             // Format Frozen HWM & Stop
                             hwmStr = fHwm !== undefined ? `${fHwm.toFixed(2)}%` : '---';
@@ -825,6 +837,9 @@
                 const labels = data.map(d => d.time);
                 const returns = data.map(d => d.return);
                 const stops = data.map(d => d.stop);
+                
+                // NEW: MC Probability Data
+                const mcProbs = data.map(d => d.mc_prob || 0);
 
                 // Create custom point shapes for events
                 const pointStyles = data.map(d => {
@@ -843,6 +858,18 @@
                     if (d.event === 'Armed' || d.event === 'TP-Armed') return '#eab308'; // amber-500
                     if (d.event === 'Triggered') return '#e11d48'; // rose-600
                     return '#10b981';
+                });
+                
+                // NEW: Bar Colors for MC Prob based on Strat Thresholds
+                const barColors = mcProbs.map(p => {
+                    if (p < 5.0) return 'rgba(217, 70, 239, 0.4)'; // Fuchsia (TP Zone)
+                    if (p < 15.0) return 'rgba(245, 158, 11, 0.4)'; // Amber (Armed Zone)
+                    return 'rgba(59, 130, 246, 0.2)'; // Blue (Safe Zone)
+                });
+                const barBorders = mcProbs.map(p => {
+                    if (p < 5.0) return 'rgba(217, 70, 239, 0.8)';
+                    if (p < 15.0) return 'rgba(245, 158, 11, 0.8)';
+                    return 'rgba(59, 130, 246, 0.5)';
                 });
 
                 const ctx = document.getElementById('intradayChart').getContext('2d');
@@ -867,6 +894,7 @@
                                 pointRadius: pointRadii,
                                 pointBackgroundColor: pointColors,
                                 pointBorderColor: pointColors,
+                                yAxisID: 'y',
                                 order: 2
                             },
                             {
@@ -878,7 +906,20 @@
                                 stepped: true,
                                 spanGaps: false, // Breaks the line when stop is null (unarmed)
                                 pointRadius: 0,
+                                yAxisID: 'y',
                                 order: 1
+                            },
+                            {
+                                type: 'bar',
+                                label: 'MC Probability (%)',
+                                data: mcProbs,
+                                backgroundColor: barColors,
+                                borderColor: barBorders,
+                                borderWidth: {top: 1, right: 0, bottom: 0, left: 0},
+                                yAxisID: 'y1', // Secondary Axis for bottom rendering
+                                order: 3,
+                                barPercentage: 0.9,
+                                categoryPercentage: 1.0
                             }
                         ]
                     },
@@ -919,11 +960,22 @@
                                 ticks: { color: '#94a3b8', maxTicksLimit: 12 }
                             },
                             y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
                                 grid: { color: '#334155', drawBorder: false },
                                 ticks: { 
                                     color: '#94a3b8',
                                     callback: function(value) { return value + '%'; }
                                 }
+                            },
+                            y1: {
+                                type: 'linear',
+                                display: false, // Hides the labels/axis line to keep it clean
+                                position: 'right',
+                                min: 0,
+                                max: 400, // Forces the 0-100 bars to only occupy the bottom 25% of the chart area
+                                grid: { drawOnChartArea: false }
                             }
                         }
                     }
