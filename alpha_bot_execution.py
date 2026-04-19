@@ -838,6 +838,59 @@ def main():
     # Save the aggregated chart history at the end of the evaluation loop
     save_chart_history(chart_history)
 
+# ==========================================
+# 6. POST MORTEM REPORT CREATION
+# ==========================================
+
+def generate_eod_snapshot(bot_state, current_date_str):
+    """Generates a daily post-mortem JSON snapshot."""
+    report_file = f"post_mortem_{current_date_str}.json"
+    if os.path.exists(report_file):
+        return  # Already generated today
+
+    print(f"  -> Generating EOD Post-Mortem Snapshot: {report_file}")
+    report = {
+        "date": current_date_str,
+        "summary": {
+            "total_monitored": 0,
+            "total_triggered": 0,
+            "positive_guard_alpha_count": 0
+        },
+        "triggers": []
+    }
+
+    for sym_id, sym in bot_state.items():
+        if sym_id == "date":
+            continue
+        
+        report["summary"]["total_monitored"] += 1
+        
+        if sym.get("triggered"):
+            report["summary"]["total_triggered"] += 1
+            
+            f_ret = sym.get("triggered_at_return", 0.0)
+            live_ret = sym.get("current_return", 0.0)
+            saved_pct = f_ret - live_ret  # Guard Alpha
+            
+            if saved_pct > 0:
+                report["summary"]["positive_guard_alpha_count"] += 1
+            
+            # Identify if it was a Take-Profit or Stop-Loss
+            exit_reason = "Take-Profit" if f_ret == sym.get("triggered_at_stop") else "Trailing Stop"
+            
+            report["triggers"].append({
+                "symphony_name": sym.get("name", "Unknown"),
+                "exit_reason": exit_reason,
+                "exit_return": round(f_ret, 2),
+                "shadow_return": round(live_ret, 2),
+                "saved_pct_guard_alpha": round(saved_pct, 2),
+                "hwm_at_trigger": round(sym.get("triggered_at_hwm", 0.0), 2),
+                "time_triggered": sym.get("triggered_at_time", ""),
+                "symphony_vol": round(sym.get("symphony_vol", 0.0), 2)
+            })
+    
+    with open(report_file, "w", encoding="utf-8") as f:
+        json.dump(report, f, indent=4)
 
 if __name__ == "__main__":
     main()
