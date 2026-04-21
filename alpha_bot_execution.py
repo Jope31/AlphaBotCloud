@@ -260,7 +260,7 @@ def generate_eod_snapshot(bot_state, current_date_str, is_post_rebalance=False):
             json.dump(report, f, indent=4)
 
     else:
-        # STAGE 2 (16:00 ET): Inject Tomorrow's Holdings
+        # STAGE 2 (16:00 ET): Inject Tomorrow's Holdings and Fix Final Math
         if not os.path.exists(report_file):
             print("  -> Warning: Stage 1 snapshot missing. Cannot inject new holdings.")
             return
@@ -271,7 +271,7 @@ def generate_eod_snapshot(bot_state, current_date_str, is_post_rebalance=False):
         if "STATUS" not in report.get("tomorrow_target_holdings", {}):
             return
 
-        print(f"  -> Generating Stage 2 Post-Mortem (Injecting Holdings): {report_file}")
+        print(f"  -> Generating Stage 2 Post-Mortem (Injecting Holdings & Correcting EOD Alpha): {report_file}")
 
         portfolio_holdings_summary = {}
 
@@ -280,9 +280,18 @@ def generate_eod_snapshot(bot_state, current_date_str, is_post_rebalance=False):
                 continue
 
             sym_holdings = [h.get("ticker") for h in sym.get("current_holdings", [])]
+            
+            # Recalculate true 16:00 EOD Guard Alpha (because bot_state has been updated)
+            live_ret = sym.get("current_return", 0.0)
+            f_ret = sym.get("triggered_at_return", 0.0)
+            saved_pct = f_ret - live_ret
+
             for trigger in report.get("triggers", []):
                 if trigger.get("symphony_name") == sym.get("name"):
                     trigger["next_day_holdings"] = sym_holdings
+                    # Update snapshot with genuine 16:00 close prices instead of 15:53
+                    trigger["shadow_return"] = round(live_ret, 2)
+                    trigger["saved_pct_guard_alpha"] = round(saved_pct, 2)
 
             for holding in sym.get("current_holdings", []):
                 ticker = holding.get("ticker", "UNKNOWN")
@@ -290,6 +299,10 @@ def generate_eod_snapshot(bot_state, current_date_str, is_post_rebalance=False):
                 if ticker not in portfolio_holdings_summary:
                     portfolio_holdings_summary[ticker] = 0.0
                 portfolio_holdings_summary[ticker] += weight
+                
+        # Re-tally summary guard alpha count correctly based on 16:00 data
+        pos_alpha_count = sum(1 for t in report.get("triggers", []) if t.get("saved_pct_guard_alpha", 0) > 0)
+        report["summary"]["positive_guard_alpha_count"] = pos_alpha_count
 
         sorted_holdings = dict(
             sorted(portfolio_holdings_summary.items(), key=lambda item: item[1], reverse=True)
@@ -734,6 +747,8 @@ def main():
                             }
                             for h in sym.get("holdings", [])
                         ]
+                        # BUG FIX: Update the true 16:00 close price for shadow returns/Guard Alpha math
+                        bot_state[s_id]["current_return"] = sym.get("last_percent_change", 0.0) * 100
             save_state(bot_state)
             generate_eod_snapshot(bot_state, current_date_str, is_post_rebalance=True)
             print("  -> EOD Post-Mortem Snapshot complete. Ending execution for the day.")
