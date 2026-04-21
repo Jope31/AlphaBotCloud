@@ -1,4 +1,4 @@
-"""Flask application for the Alpha Bot Control Center."""
+"""Flask application for the Alpha Bot Control Center with Robust JSON Reads."""
 
 import os
 import json
@@ -52,13 +52,23 @@ def dashboard():
 
 @app.route("/api/state")
 def get_state():
-    """Returns the current state of the bot."""
+    """Returns the current state of the bot with error handling for race conditions."""
     try:
         if not os.path.exists("bot_state.json"):
             return jsonify({"status": "waiting", "message": "bot_state.json not created yet."})
 
-        with open("bot_state.json", "r", encoding="utf-8") as f:
-            state_data = json.load(f)
+        # Try to read the file up to 3 times in case of mid-write lockout (Atomic Swap)
+        state_data = None
+        for _ in range(3):
+            try:
+                with open("bot_state.json", "r", encoding="utf-8") as f:
+                    state_data = json.load(f)
+                    break 
+            except (json.JSONDecodeError, ValueError):
+                time.sleep(0.1) # Wait 100ms for atomic swap to finish
+
+        if state_data is None:
+            return jsonify({"status": "waiting", "message": "State file busy or corrupted. Retrying..."})
 
         env_vars = dotenv_values(".env")
         live_mode = env_vars.get("LIVE_EXECUTION", "False").lower() in (
@@ -84,7 +94,7 @@ def get_state():
             }
         )
 
-    except OSError as e:
+    except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
