@@ -217,12 +217,19 @@
                                 </div>
                                 <input type="number" step="0.05" id="env-squeeze-floor" required class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                             </div>
-                            <div class="relative group">
-                                <div class="flex justify-between items-center mb-1">
-                                    <label class="text-sm font-semibold text-slate-300 flex items-center gap-1.5 cursor-help">BASE_ATR_MULTIPLIER</label>
-                                    <span class="text-xs text-slate-500">Default: 2.0</span>
+                            <div class="grid grid-cols-3 gap-3">
+                                <div class="relative group">
+                                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mb-1 block">VIX_LOW_MULT</label>
+                                    <input type="number" step="0.1" id="env-vix-low" required class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-white text-xs focus:outline-none focus:border-blue-500">
                                 </div>
-                                <input type="number" step="0.1" id="env-atr" required class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                <div class="relative group">
+                                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mb-1 block">VIX_MID_MULT</label>
+                                    <input type="number" step="0.1" id="env-vix-mid" required class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-white text-xs focus:outline-none focus:border-blue-500">
+                                </div>
+                                <div class="relative group">
+                                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mb-1 block">VIX_HIGH_MULT</label>
+                                    <input type="number" step="0.1" id="env-vix-high" required class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-white text-xs focus:outline-none focus:border-blue-500">
+                                </div>
                             </div>
                             <div class="relative group">
                                 <div class="flex justify-between items-center mb-1">
@@ -354,7 +361,7 @@
             <div class="p-6 bg-slate-800 border-b border-slate-700 shrink-0 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-4">
                 <div>
                     <div class="flex justify-between items-center mb-2">
-                        <label class="text-[10px] font-semibold text-slate-300">ATR Mult.</label>
+                        <label class="text-[10px] font-semibold text-slate-300">Regime Mult.</label>
                         <span class="text-sm font-mono text-emerald-400 font-bold" id="sim-atr-val">2.00</span>
                     </div>
                     <input type="range" id="sim-atr-slider" min="0.5" max="5.0" step="0.1" value="2.0" class="w-full accent-emerald-500" oninput="runSimulation()">
@@ -1051,13 +1058,17 @@
                 document.getElementById('env-trigger').value = vars.TRIGGER_THRESHOLD_PCT || 15.0;
                 document.getElementById('env-loss-arm').value = vars.LOSS_ARM_PCT || 1.5;
                 document.getElementById('env-squeeze-floor').value = vars.MAX_SQUEEZE_FLOOR || 0.20;
-                document.getElementById('env-atr').value = vars.BASE_ATR_MULTIPLIER || 2.0;
+                
+                // Map the new VIX variables
+                document.getElementById('env-vix-low').value = vars.VIX_LOW_MULT || 1.5;
+                document.getElementById('env-vix-mid').value = vars.VIX_MID_MULT || 2.0;
+                document.getElementById('env-vix-high').value = vars.VIX_HIGH_MULT || 2.5;
+
                 document.getElementById('env-floor').value = vars.MIN_MULTIPLIER_FLOOR || 0.5;
                 document.getElementById('env-trailing-stop').value = vars.TRAILING_STOP_PCT || 1.5;
                 document.getElementById('env-ending-stop').value = vars.ENDING_STOP_PCT || 0.5;
                 document.getElementById('env-breakeven').value = vars.BREAKEVEN_ACTIVATION_PCT || 2.0;
                 
-                // Map new variables
                 document.getElementById('env-vwap-hwm').value = vars.VWAP_CROSS_HWM_PCT || 1.0;
                 document.getElementById('env-para-vel').value = vars.PARABOLIC_VELOCITY_THRESHOLD || 2.0;
                 document.getElementById('env-para-sqz').value = vars.MAX_PARABOLIC_SQUEEZE || 0.50;
@@ -1112,7 +1123,12 @@
                 TRIGGER_THRESHOLD_PCT: document.getElementById('env-trigger').value,
                 LOSS_ARM_PCT: document.getElementById('env-loss-arm').value,
                 MAX_SQUEEZE_FLOOR: document.getElementById('env-squeeze-floor').value,
-                BASE_ATR_MULTIPLIER: document.getElementById('env-atr').value,
+                
+                // Save the new VIX variables
+                VIX_LOW_MULT: document.getElementById('env-vix-low').value,
+                VIX_MID_MULT: document.getElementById('env-vix-mid').value,
+                VIX_HIGH_MULT: document.getElementById('env-vix-high').value,
+                
                 MIN_MULTIPLIER_FLOOR: document.getElementById('env-floor').value,
                 TRAILING_STOP_PCT: document.getElementById('env-trailing-stop').value,
                 ENDING_STOP_PCT: document.getElementById('env-ending-stop').value,
@@ -1155,7 +1171,7 @@
                 const response = await fetch('/api/settings');
                 const vars = await response.json();
 
-                if(vars.BASE_ATR_MULTIPLIER) document.getElementById('sim-atr-slider').value = vars.BASE_ATR_MULTIPLIER;
+                if(vars.VIX_MID_MULT) document.getElementById('sim-atr-slider').value = vars.VIX_MID_MULT;
                 if(vars.MIN_MULTIPLIER_FLOOR) document.getElementById('sim-floor-slider').value = vars.MIN_MULTIPLIER_FLOOR;
                 if(vars.BREAKEVEN_ACTIVATION_PCT) document.getElementById('sim-breakeven-slider').value = vars.BREAKEVEN_ACTIVATION_PCT;
                 if(vars.TRIGGER_THRESHOLD_PCT) document.getElementById('sim-trigger-slider').value = vars.TRIGGER_THRESHOLD_PCT;
