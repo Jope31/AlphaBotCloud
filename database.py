@@ -1,82 +1,175 @@
-"""SQLite Database Manager for AlphaBot State & Concurrency."""
+"""SQLite state management for AlphaBot to handle concurrency."""
 
 import sqlite3
 import json
 import time
 
-DB_PATH = "alphabot.db"
+DB_FILE = "alphabot_state.db"
+
+def get_connection():
+    return sqlite3.connect(DB_FILE, timeout=10.0)
 
 def init_db():
-    """Initializes the SQLite database and tables."""
-    with sqlite3.connect(DB_PATH, timeout=10) as conn:
-        # Core State Tables
-        conn.execute("CREATE TABLE IF NOT EXISTS bot_state (key TEXT PRIMARY KEY, data TEXT)")
-        conn.execute("CREATE TABLE IF NOT EXISTS chart_history (date TEXT, data TEXT)")
-        
-        # Concurrency & Cache Tables
-        conn.execute("CREATE TABLE IF NOT EXISTS locks (lock_name TEXT PRIMARY KEY, timestamp REAL)")
-        conn.execute("CREATE TABLE IF NOT EXISTS system_cache (key TEXT PRIMARY KEY, data TEXT, timestamp REAL)")
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    # Existing tables
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS bot_state (
+            id INTEGER PRIMARY KEY,
+            data TEXT
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS execution_lock (
+            id INTEGER PRIMARY KEY,
+            is_locked INTEGER,
+            timestamp REAL
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS chart_history (
+            id INTEGER PRIMARY KEY,
+            data TEXT
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS vix_cache (
+            id INTEGER PRIMARY KEY,
+            vix_value REAL,
+            timestamp REAL
+        )
+    """)
+    
+    # NEW: 5-Day Historical Chart Archive
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS chart_archive (
+            date TEXT,
+            symphony_id TEXT,
+            data TEXT,
+            UNIQUE(date, symphony_id)
+        )
+    """)
 
+    cursor.execute("INSERT OR IGNORE INTO execution_lock (id, is_locked, timestamp) VALUES (1, 0, 0)")
+    cursor.execute("INSERT OR IGNORE INTO bot_state (id, data) VALUES (1, '{}')")
+    cursor.execute("INSERT OR IGNORE INTO chart_history (id, data) VALUES (1, '{}')")
+    cursor.execute("INSERT OR IGNORE INTO vix_cache (id, vix_value, timestamp) VALUES (1, 20.0, 0)")
+    
+    conn.commit()
+    conn.close()
+
+# --- Lock Management ---
 def acquire_lock():
-    """Acquires an execution lock via SQLite to prevent overlapping minute runs."""
-    with sqlite3.connect(DB_PATH, timeout=10) as conn:
-        cur = conn.execute("SELECT timestamp FROM locks WHERE lock_name='execution'")
-        row = cur.fetchone()
-        current_time = time.time()
+    conn = get_connection()
+    cursor = conn.cursor()
+    current_time = time.time()
+    
+    cursor.execute("SELECT is_locked, timestamp FROM execution_lock WHERE id = 1")
+    row = cursor.fetchone()
+    
+    if row[0] == 1 and (current_time - row[1] < 60):
+        conn.close()
+        return False
         
-        # If lock exists and is younger than 3 minutes (180s), block execution
-        if row and (current_time - row[0]) < 180:
-            return False 
-        
-        # Otherwise, claim/overwrite the lock atomically
-        conn.execute("INSERT OR REPLACE INTO locks (lock_name, timestamp) VALUES ('execution', ?)", (current_time,))
-        return True
+    cursor.execute("UPDATE execution_lock SET is_locked = 1, timestamp = ? WHERE id = 1", (current_time,))
+    conn.commit()
+    conn.close()
+    return True
 
 def release_lock():
-    """Releases the execution lock."""
-    with sqlite3.connect(DB_PATH, timeout=10) as conn:
-        conn.execute("DELETE FROM locks WHERE lock_name='execution'")
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE execution_lock SET is_locked = 0 WHERE id = 1")
+    conn.commit()
+    conn.close()
 
+# --- State Management ---
 def load_state():
-    """Loads the core dictionary state."""
-    with sqlite3.connect(DB_PATH, timeout=10) as conn:
-        cur = conn.execute("SELECT data FROM bot_state WHERE key='current_state'")
-        row = cur.fetchone()
-        return json.loads(row[0]) if row else {}
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT data FROM bot_state WHERE id = 1")
+    row = cursor.fetchone()
+    conn.close()
+    return json.loads(row[0]) if row else {}
 
-def save_state(state):
-    """Saves the core dictionary state atomically."""
-    with sqlite3.connect(DB_PATH, timeout=10) as conn:
-        conn.execute("INSERT OR REPLACE INTO bot_state (key, data) VALUES (?, ?)",
-                     ('current_state', json.dumps(state)))
+def save_state(state_dict):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE bot_state SET data = ? WHERE id = 1", (json.dumps(state_dict),))
+    conn.commit()
+    conn.close()
 
+# --- Intraday Chart History Management ---
 def load_chart_history():
-    """Loads the chart timeseries dictionary."""
-    with sqlite3.connect(DB_PATH, timeout=10) as conn:
-        cur = conn.execute("SELECT data FROM chart_history WHERE date='current_chart'")
-        row = cur.fetchone()
-        return json.loads(row[0]) if row else {}
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT data FROM chart_history WHERE id = 1")
+    row = cursor.fetchone()
+    conn.close()
+    return json.loads(row[0]) if row else {}
 
-def save_chart_history(history):
-    """Saves the chart timeseries dictionary."""
-    with sqlite3.connect(DB_PATH, timeout=10) as conn:
-        conn.execute("INSERT OR REPLACE INTO chart_history (date, data) VALUES (?, ?)",
-                     ('current_chart', json.dumps(history, separators=(",", ":"))))
+def save_chart_history(chart_dict):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE chart_history SET data = ? WHERE id = 1", (json.dumps(chart_dict),))
+    conn.commit()
+    conn.close()
 
+# --- Historical Archive Management (NEW) ---
+def save_chart_archive(date_str, symphony_id, data):
+    """Saves a symphony's completed intraday chart data into the permanent archive."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT OR REPLACE INTO chart_archive (date, symphony_id, data) 
+        VALUES (?, ?, ?)
+    """, (date_str, symphony_id, json.dumps(data)))
+    conn.commit()
+    conn.close()
+
+def get_rolling_5day_chart(current_date_str):
+    """Retrieves the last 5 trading days of minute-by-minute data for the Autotuner."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    # Get the 5 most recent distinct dates
+    cursor.execute("SELECT DISTINCT date FROM chart_archive ORDER BY date DESC LIMIT 5")
+    dates = [row[0] for row in cursor.fetchall()]
+    
+    if not dates:
+        conn.close()
+        return {}
+        
+    # Get all records for those dates
+    placeholders = ",".join("?" * len(dates))
+    cursor.execute(f"SELECT date, symphony_id, data FROM chart_archive WHERE date IN ({placeholders})", dates)
+    
+    history_5d = {}
+    for row in cursor.fetchall():
+        date, sym_id, data_json = row[0], row[1], row[2]
+        if sym_id not in history_5d:
+            history_5d[sym_id] = {}
+        history_5d[sym_id][date] = json.loads(data_json)
+        
+    conn.close()
+    return history_5d
+
+# --- VIX Cache Management ---
 def get_vix_cache():
-    """Retrieves cached VIX data to prevent Yahoo Finance API bans."""
-    with sqlite3.connect(DB_PATH, timeout=10) as conn:
-        cur = conn.execute("SELECT data, timestamp FROM system_cache WHERE key='vix'")
-        row = cur.fetchone()
-        if row:
-            return {"vix_value": float(row[0]), "timestamp": row[1]}
-        return None
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT vix_value, timestamp FROM vix_cache WHERE id = 1")
+    row = cursor.fetchone()
+    conn.close()
+    return {"vix_value": row[0], "timestamp": row[1]} if row else None
 
 def set_vix_cache(vix_value):
-    """Updates the VIX cache."""
-    with sqlite3.connect(DB_PATH, timeout=10) as conn:
-        conn.execute("INSERT OR REPLACE INTO system_cache (key, data, timestamp) VALUES (?, ?, ?)",
-                     ('vix', str(vix_value), time.time()))
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE vix_cache SET vix_value = ?, timestamp = ? WHERE id = 1", (vix_value, time.time()))
+    conn.commit()
+    conn.close()
 
-# Auto-initialize tables when this module is imported
+# Initialize tables on import
 init_db()
