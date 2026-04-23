@@ -511,7 +511,7 @@ def get_alpaca_headers():
     return {"APCA-API-KEY-ID": ALPACA_KEY, "APCA-API-SECRET-KEY": ALPACA_SECRET}
 
 def fetch_symphony_stats(account_id):
-    url = f"[https://api.composer.trade/api/v0.1/portfolio/accounts/](https://api.composer.trade/api/v0.1/portfolio/accounts/){account_id}/symphony-stats-meta"
+    url = f"https://api.composer.trade/api/v0.1/portfolio/accounts/{account_id}/symphony-stats-meta"
     try:
         response = requests.get(url, headers=get_composer_headers(), timeout=15)
         time.sleep(1.5)
@@ -523,7 +523,7 @@ def fetch_symphony_stats(account_id):
     return []
 
 def execute_sell_to_cash(actual_symphony_id, account_id):
-    url = f"[https://api.composer.trade/api/v0.1/deploy/accounts/](https://api.composer.trade/api/v0.1/deploy/accounts/){account_id}/symphonies/{actual_symphony_id}/go-to-cash"
+    url = f"https://api.composer.trade/api/v0.1/deploy/accounts/{account_id}/symphonies/{actual_symphony_id}/go-to-cash"
     try:
         response = requests.post(url, headers=get_composer_headers(), json={}, timeout=10)
         print(f"     -> [API Status]: HTTP {response.status_code}")
@@ -612,7 +612,7 @@ def fetch_alpaca_history(tickers, current_date_str):
 
         page_token = None
         while True:
-            url = f"[https://data.alpaca.markets/v2/stocks/bars?symbols=](https://data.alpaca.markets/v2/stocks/bars?symbols=){symbol_string}&timeframe=1Day&start={start_date}&limit=10000&adjustment=split"
+            url = f"https://data.alpaca.markets/v2/stocks/bars?symbols={symbol_string}&timeframe=1Day&start={start_date}&limit=10000&adjustment=split"
             if page_token:
                 url += f"&page_token={page_token}"
 
@@ -662,7 +662,7 @@ def fetch_alpaca_history(tickers, current_date_str):
 def get_live_spy_data():
     start_date = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%dT00:00:00Z")
     headers = get_alpaca_headers()
-    url = f"[https://data.alpaca.markets/v2/stocks/bars?symbols=SPY&timeframe=1Day&start=](https://data.alpaca.markets/v2/stocks/bars?symbols=SPY&timeframe=1Day&start=){start_date}&limit=10"
+    url = f"https://data.alpaca.markets/v2/stocks/bars?symbols=SPY&timeframe=1Day&start={start_date}&limit=10"
 
     try:
         response = requests.get(url, headers=headers, timeout=10)
@@ -692,7 +692,7 @@ def fetch_intraday_vwaps(tickers, headers, current_et):
     for i in range(0, len(tickers_list), batch_size):
         batch = tickers_list[i : i + batch_size]
         symbol_string = ",".join(batch)
-        url = f"[https://data.alpaca.markets/v2/stocks/bars?symbols=](https://data.alpaca.markets/v2/stocks/bars?symbols=){symbol_string}&timeframe=1Min&start={start_utc_str}&limit=1000"
+        url = f"https://data.alpaca.markets/v2/stocks/bars?symbols={symbol_string}&timeframe=1Min&start={start_utc_str}&limit=1000"
         
         try:
             response = requests.get(url, headers=headers, timeout=15)
@@ -722,7 +722,7 @@ def get_live_vix():
     if cache and (current_time - cache["timestamp"] < 900):
         return cache["vix_value"]
 
-    url = "[https://query2.finance.yahoo.com/v8/finance/chart/](https://query2.finance.yahoo.com/v8/finance/chart/)^VIX?interval=1d&range=1d"
+    url = "https://query2.finance.yahoo.com/v8/finance/chart/^VIX?interval=1d&range=1d"
     headers = {"User-Agent": "Mozilla/5.0"}
     vix_value = 20.0
 
