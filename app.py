@@ -9,7 +9,7 @@ import schedule
 import requests
 from flask import Flask, render_template, jsonify, request
 from dotenv import dotenv_values, set_key, find_dotenv
-from alpha_bot_execution import get_composer_headers
+from alpha_bot_execution import get_composer_headers, COMPOSER_BASE_URL
 
 import database
 
@@ -99,7 +99,7 @@ def manual_trigger():
 def perform_account_liquidation(account_id, key, secret, live_mode):
     """Performs account liquidation via the Composer API."""
     headers = get_composer_headers(key=key, secret=secret)
-    url = f"https://api.composer.trade/api/v0.1/portfolio/accounts/{account_id}/symphony-stats-meta"
+    url = f"{COMPOSER_BASE_URL}/portfolio/accounts/{account_id}/symphony-stats-meta"
 
     try:
         resp = requests.get(url, headers=headers, timeout=10)
@@ -110,7 +110,7 @@ def perform_account_liquidation(account_id, key, secret, live_mode):
             for sym in symphonies:
                 if live_mode:
                     act_sym_id = sym.get("symphony_id", sym["id"])
-                    sell_url = f"https://api.composer.trade/api/v0.1/deploy/accounts/{account_id}/symphonies/{act_sym_id}/go-to-cash"
+                    sell_url = f"{COMPOSER_BASE_URL}/deploy/accounts/{account_id}/symphonies/{act_sym_id}/go-to-cash"
                     sell_resp = requests.post(sell_url, headers=headers, json={}, timeout=10)
 
                     sym_name = sym.get("name", sym["id"])
