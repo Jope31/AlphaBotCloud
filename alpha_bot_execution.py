@@ -41,6 +41,7 @@ DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 
 # --- EXECUTION MODE ---
 LIVE_EXECUTION = os.getenv("LIVE_EXECUTION", "False").lower() in ("true", "1", "yes")
+EXECUTION_START_TIME = os.getenv("EXECUTION_START_TIME", "09:30")
 
 # --- STRATEGY PARAMETERS ---
 TRIGGER_THRESHOLD_PCT = float(os.getenv("TRIGGER_THRESHOLD_PCT", "15.0"))
@@ -967,6 +968,12 @@ def main():
         is_weekday = current_et.weekday() < 5
         current_time = current_et.time()
 
+        try:
+            exec_hour, exec_min = map(int, EXECUTION_START_TIME.split(":"))
+        except ValueError:
+            exec_hour, exec_min = 9, 30
+
+        execution_start = dt_time(exec_hour, exec_min)
         market_open = dt_time(9, 30)
         market_close = dt_time(16, 0)
         rebalance_blackout = dt_time(15, 54)
@@ -1394,38 +1401,67 @@ def main():
                 )
 
                 if is_trailing_stop_hit or tp_triggered_now or is_vwap_broken:
-                    if tp_triggered_now:
-                        reason = "Take-Profit"
-                    elif is_vwap_broken:
-                        reason = "VWAP Breakdown"
-                    else:
-                        reason = "Trailing Stop"
-
-                    print(f"  🚨 {reason.upper()} HIT FOR {symphony_name} 🚨")
-
-                    bot_state[symphony_id]["armed"] = False
-                    bot_state[symphony_id]["tp_armed"] = False
-                    bot_state[symphony_id]["triggered"] = True
-                    bot_state[symphony_id]["triggered_reason"] = reason
-                    bot_state[symphony_id]["triggered_at_return"] = current_return
-                    bot_state[symphony_id]["triggered_at_hwm"] = safe_hwm
-                    bot_state[symphony_id]["triggered_at_stop"] = (
-                        current_return
-                        if (tp_triggered_now or is_vwap_broken)
-                        else stop_trigger_level
-                    )
-                    bot_state[symphony_id]["triggered_at_time"] = current_time_str
-                    bot_state[symphony_id]["high_water_mark"] = -999.0
-
-                    database.save_state(bot_state)
-                    sym_chart_data[-1]["stop"] = bot_state[symphony_id]["triggered_at_stop"]
-
-                    if LIVE_EXECUTION:
+                    if current_time < execution_start and not force_run:
                         print(
-                            "  -> [LIVE EXECUTION] Sending sell-to-cash command to Composer API..."
+                            f"  ⚠️ Trigger hit for {symphony_name[:35]}, but ignoring because time is before {execution_start.strftime('%H:%M')}."
                         )
-                        success = execute_sell_to_cash(actual_symphony_id, account)
-                        if success:
+                    else:
+                        if tp_triggered_now:
+                            reason = "Take-Profit"
+                        elif is_vwap_broken:
+                            reason = "VWAP Breakdown"
+                        else:
+                            reason = "Trailing Stop"
+
+                        print(f"  🚨 {reason.upper()} HIT FOR {symphony_name} 🚨")
+
+                        bot_state[symphony_id]["armed"] = False
+                        bot_state[symphony_id]["tp_armed"] = False
+                        bot_state[symphony_id]["triggered"] = True
+                        bot_state[symphony_id]["triggered_reason"] = reason
+                        bot_state[symphony_id]["triggered_at_return"] = current_return
+                        bot_state[symphony_id]["triggered_at_hwm"] = safe_hwm
+                        bot_state[symphony_id]["triggered_at_stop"] = (
+                            current_return
+                            if (tp_triggered_now or is_vwap_broken)
+                            else stop_trigger_level
+                        )
+                        bot_state[symphony_id]["triggered_at_time"] = current_time_str
+                        bot_state[symphony_id]["high_water_mark"] = -999.0
+
+                        database.save_state(bot_state)
+                        sym_chart_data[-1]["stop"] = bot_state[symphony_id]["triggered_at_stop"]
+
+                        if LIVE_EXECUTION:
+                            print(
+                                "  -> [LIVE EXECUTION] Sending sell-to-cash command to Composer API..."
+                            )
+                            success = execute_sell_to_cash(actual_symphony_id, account)
+                            if success:
+                                send_discord_alert(
+                                    symphony_name,
+                                    current_return,
+                                    prob_beating,
+                                    stop_trigger_level,
+                                    safe_hwm,
+                                    LIVE_EXECUTION,
+                                    exit_reason=reason,
+                                )
+                            else:
+                                print(
+                                    "     !!! EXECUTION FAILED. Reverting state to retry next loop !!!"
+                                )
+                                bot_state = database.load_state()
+                                bot_state[symphony_id]["triggered"] = False
+                                bot_state[symphony_id]["armed"] = (
+                                    not tp_triggered_now and not is_vwap_broken
+                                )
+                                bot_state[symphony_id]["tp_armed"] = tp_triggered_now
+                                bot_state[symphony_id]["high_water_mark"] = safe_hwm
+                                database.save_state(bot_state)
+                                sym_chart_data[-1]["stop"] = stop_trigger_level
+                        else:
+                            print("  -> [DRY RUN] Execution bypassed.")
                             send_discord_alert(
                                 symphony_name,
                                 current_return,
@@ -1435,30 +1471,6 @@ def main():
                                 LIVE_EXECUTION,
                                 exit_reason=reason,
                             )
-                        else:
-                            print(
-                                "     !!! EXECUTION FAILED. Reverting state to retry next loop !!!"
-                            )
-                            bot_state = database.load_state()
-                            bot_state[symphony_id]["triggered"] = False
-                            bot_state[symphony_id]["armed"] = (
-                                not tp_triggered_now and not is_vwap_broken
-                            )
-                            bot_state[symphony_id]["tp_armed"] = tp_triggered_now
-                            bot_state[symphony_id]["high_water_mark"] = safe_hwm
-                            database.save_state(bot_state)
-                            sym_chart_data[-1]["stop"] = stop_trigger_level
-                    else:
-                        print("  -> [DRY RUN] Execution bypassed.")
-                        send_discord_alert(
-                            symphony_name,
-                            current_return,
-                            prob_beating,
-                            stop_trigger_level,
-                            safe_hwm,
-                            LIVE_EXECUTION,
-                            exit_reason=reason,
-                        )
 
         database.save_state(bot_state)
         database.save_chart_history(chart_history)

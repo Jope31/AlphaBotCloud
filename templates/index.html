@@ -37,6 +37,13 @@
                         <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         <span id="ny-time" class="font-mono tracking-wide">--:--:-- ET</span>
                     </div>
+                    <div class="h-4 w-px bg-slate-600 ml-2"></div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-white text-sm font-bold">Execution start:</span>
+                        <div class="bg-slate-800 border border-slate-600 px-3 py-0.5 rounded shadow-inner min-w-[70px] text-center">
+                            <span id="exec-start-display" class="font-mono text-slate-300 text-sm">--:--</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -133,15 +140,23 @@
                     <!-- SECTION 1: EXECUTION MODE -->
                     <div>
                         <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-700 pb-2">Execution Mode</h4>
-                        <div class="bg-slate-900 border border-slate-700 p-5 rounded-xl flex items-center justify-between transition-colors duration-300" id="mode-container">
-                            <div>
-                                <h4 class="text-sm font-bold text-white mb-0.5 transition-colors duration-300" id="mode-title">Dry Run Mode</h4>
-                                <p class="text-xs text-slate-400 transition-colors duration-300" id="mode-desc">Safe: Bot will simulate trades but bypass actual execution.</p>
+                        <div class="space-y-4">
+                            <div class="bg-slate-900 border border-slate-700 p-5 rounded-xl flex items-center justify-between transition-colors duration-300" id="mode-container">
+                                <div>
+                                    <h4 class="text-sm font-bold text-white mb-0.5 transition-colors duration-300" id="mode-title">Dry Run Mode</h4>
+                                    <p class="text-xs text-slate-400 transition-colors duration-300" id="mode-desc">Safe: Bot will simulate trades but bypass actual execution.</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="env-live-mode" class="sr-only peer" onchange="toggleModeUI(this)">
+                                    <div class="w-11 h-6 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-500 shadow-inner"></div>
+                                </label>
                             </div>
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" id="env-live-mode" class="sr-only peer" onchange="toggleModeUI(this)">
-                                <div class="w-11 h-6 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-500 shadow-inner"></div>
-                            </label>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="text-xs font-semibold text-slate-300 mb-1 block">Execution Start Time (ET)</label>
+                                    <input type="time" id="env-exec-start" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -635,6 +650,7 @@
             globalStateCache = stateObj; // Cache for simulator
 
             document.getElementById('state-date').innerHTML = `<span class="font-semibold text-slate-500">Ledger:</span> ${stateObj.date || 'Unknown'}`;
+            document.getElementById('exec-start-display').textContent = data.execution_start_time || '--:--';
 
             const symphonyKeys = Object.keys(stateObj).filter(k => k !== 'date');
             let armedCount = 0;
@@ -1117,6 +1133,7 @@
                 toggle.checked = isLive;
                 toggleModeUI(toggle);
 
+                document.getElementById('env-exec-start').value = vars.EXECUTION_START_TIME || '09:30';
                 document.getElementById('env-tp-mc').value = vars.TAKE_PROFIT_MC_PCT || 5.0;
                 document.getElementById('env-trigger').value = vars.TRIGGER_THRESHOLD_PCT || 15.0;
                 document.getElementById('env-loss-arm').value = vars.LOSS_ARM_PCT || 1.5;
@@ -1176,6 +1193,7 @@
 
             const payload = {
                 LIVE_EXECUTION: document.getElementById('env-live-mode').checked ? "True" : "False",
+                EXECUTION_START_TIME: document.getElementById('env-exec-start').value,
                 COMPOSER_KEY_ID: document.getElementById('env-comp-key').value.trim(),
                 COMPOSER_SECRET: document.getElementById('env-comp-sec').value.trim(),
                 ALPACA_KEY: document.getElementById('env-alp-key').value.trim(),
