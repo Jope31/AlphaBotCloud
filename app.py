@@ -80,6 +80,7 @@ def get_state():
                 "status": "active",
                 "state": state_data,
                 "live_mode": live_mode,
+                "execution_start_time": env_vars.get("EXECUTION_START_TIME", "09:30"),
                 "next_run_seconds": next_run_seconds,
             }
         )
@@ -178,6 +179,7 @@ def get_settings():
     return jsonify(
         {
             "LIVE_EXECUTION": env_vars.get("LIVE_EXECUTION", "False"),
+            "EXECUTION_START_TIME": env_vars.get("EXECUTION_START_TIME", "09:30"),
             "COMPOSER_KEY_ID": env_vars.get("COMPOSER_KEY_ID", ""),
             "COMPOSER_SECRET": env_vars.get("COMPOSER_SECRET", ""),
             "ALPACA_KEY": env_vars.get("ALPACA_KEY", ""),
@@ -216,6 +218,7 @@ def save_settings():
 
     allowed_keys = [
         "LIVE_EXECUTION",
+        "EXECUTION_START_TIME",
         "COMPOSER_KEY_ID",
         "COMPOSER_SECRET",
         "ALPACA_KEY",
