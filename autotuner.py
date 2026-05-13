@@ -51,9 +51,13 @@ def calculate_historical_deviation(current_date_str):
             except:
                 continue
 
-        for reason in deviation_dict.keys():
-            if deviation_counts[reason] > 0:
-                deviation_dict[reason] = round(deviation_sums[reason] / deviation_counts[reason], 3)
+        for k in deviation_dict.keys():
+            if deviation_counts[k] > 0:
+                avg_dev = deviation_sums[k] / deviation_counts[k]
+                if avg_dev > 0.0:
+                    print(f"  -> WARNING: Positive slippage detected for {k} ({avg_dev:.3f}). Capping at 0.0 for conservative backtesting.")
+                    avg_dev = 0.0
+                deviation_dict[k] = round(avg_dev, 3)
     except Exception as e:
         print(f"      -> Warning: Deviation calculation failed ({e}). Using defaults.")
 
