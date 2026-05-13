@@ -65,18 +65,6 @@ def get_state():
             delta = min(job.next_run for job in valid_jobs) - datetime.now()
             next_run_seconds = max(0, int(delta.total_seconds()))
 
-        # Render HTML for UI
-        symphony_keys = [k for k in state_data.keys() if isinstance(state_data[k], dict)]
-        accounts_map = {}
-        for k in symphony_keys:
-            sym = state_data[k]
-            acc_id = sym.get("account", "Unknown Account")
-            if acc_id not in accounts_map:
-                accounts_map[acc_id] = []
-            sym["id"] = k
-            sym["normalized_name"] = database.normalize_name(sym.get("name", ""))
-            accounts_map[acc_id].append(sym)
-            
         account_labels = {}
         acc_ind = env_vars.get("ACCOUNT_INDIVIDUAL", "").strip()
         acc_roth = env_vars.get("ACCOUNT_ROTH", "").strip()
@@ -85,6 +73,22 @@ def get_state():
         if acc_ind: account_labels[acc_ind] = "Individual"
         if acc_roth: account_labels[acc_roth] = "Roth IRA"
         if acc_trad: account_labels[acc_trad] = "Trad. IRA"
+
+        active_uuids = [uid for uid in [acc_ind, acc_roth, acc_trad] if uid]
+
+        # Render HTML for UI
+        symphony_keys = [k for k in state_data.keys() if isinstance(state_data[k], dict)]
+        accounts_map = {}
+        for k in symphony_keys:
+            sym = state_data[k]
+            acc_id = sym.get("account", "Unknown Account")
+            if acc_id not in active_uuids:
+                continue
+            if acc_id not in accounts_map:
+                accounts_map[acc_id] = []
+            sym["id"] = k
+            sym["normalized_name"] = database.normalize_name(sym.get("name", ""))
+            accounts_map[acc_id].append(sym)
 
         # Sorting logic
         sort_col = request.args.get("sortCol", "name")
@@ -134,11 +138,35 @@ def get_state():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route("/api/logs/<symphony_id>")
-def api_symphony_logs(symphony_id):
+@app.route("/api/history_dates")
+def get_history_dates():
+    import glob
     try:
-        logs = database.get_symphony_logs(symphony_id)
-        return jsonify(logs)
+        files = glob.glob("symphony_logs_*.json")
+        dates = []
+        for f in files:
+            date_str = f.replace("symphony_logs_", "").replace(".json", "")
+            dates.append(date_str)
+        dates.sort(reverse=True)
+        return jsonify(dates)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/logs/<date_str>/<symphony_id>")
+def api_symphony_logs(date_str, symphony_id):
+    try:
+        if symphony_id.lower() == "all":
+            # fetch all logs for the date
+            log_file = f"symphony_logs_{date_str}.json"
+            import os, json
+            if os.path.exists(log_file):
+                with open(log_file, "r", encoding="utf-8") as f:
+                    logs = json.load(f)
+                return jsonify(logs)
+            return jsonify({})
+        else:
+            logs = database.get_symphony_logs(symphony_id, date_str=date_str)
+            return jsonify(logs)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
