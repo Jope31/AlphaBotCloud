@@ -16,7 +16,8 @@ DEFAULT_STRATEGY = {
     "PARABOLIC_VELOCITY_THRESHOLD": 2.0,
     "MAX_PARABOLIC_SQUEEZE": 0.50,
     "VWAP_BLEED_MULTIPLIER": 1.5,
-    "VWAP_BLEED_TICKS": 10
+    "VWAP_BLEED_TICKS": 10,
+    "VOLATILITY_MAGNITUDE_MULTIPLIER": 0.5
 }
 
 # By default, we lock the non-user-specified variables so BO only tunes the requested
@@ -192,18 +193,24 @@ def save_symphony_strategy(symphony_name, params, locked_vars):
 # --- Symphony Logging (NEW) ---
 SYMPHONY_LOGS_FILE = "symphony_logs.json"
 
-def get_symphony_logs(symphony_id):
+def get_symphony_logs(symphony_id, date_str=None):
+    if date_str is None:
+        date_str = datetime.utcnow().strftime("%Y-%m-%d")
+    log_file = f"symphony_logs_{date_str}.json"
     try:
-        with open(SYMPHONY_LOGS_FILE, "r", encoding="utf-8") as f:
+        with open(log_file, "r", encoding="utf-8") as f:
             logs = json.load(f)
             return logs.get(symphony_id, [])
     except (FileNotFoundError, json.JSONDecodeError):
         return []
 
-def log_symphony_event(symphony_id, message, event_type="info"):
+def log_symphony_event(symphony_id, message, event_type="info", date_str=None):
+    if date_str is None:
+        date_str = datetime.utcnow().strftime("%Y-%m-%d")
+    log_file = f"symphony_logs_{date_str}.json"
     logs = {}
     try:
-        with open(SYMPHONY_LOGS_FILE, "r", encoding="utf-8") as f:
+        with open(log_file, "r", encoding="utf-8") as f:
             logs = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         pass
@@ -219,17 +226,10 @@ def log_symphony_event(symphony_id, message, event_type="info"):
     })
     
     try:
-        with open(SYMPHONY_LOGS_FILE, "w", encoding="utf-8") as f:
+        with open(log_file, "w", encoding="utf-8") as f:
             json.dump(logs, f)
     except Exception as e:
-        print(f"Error saving symphony logs: {e}")
-
-def clear_symphony_logs():
-    try:
-        with open(SYMPHONY_LOGS_FILE, "w", encoding="utf-8") as f:
-            json.dump({}, f)
-    except Exception as e:
-        print(f"Error clearing symphony logs: {e}")
+        print(f"Error saving symphony logs to {log_file}: {e}")
 
 # Initialize tables on import
 init_db()
