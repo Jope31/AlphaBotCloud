@@ -425,7 +425,7 @@ def send_eod_discord_post(current_date_str, report_file, optimization_results, d
         print(f"Failed to send EOD Discord webhook: {e}")
 
 def send_discord_alert(
-    symphony_name, current_return, prob_beating, stop_trigger_level, high_water_mark, is_live, discord_webhook_url, exit_reason="Trailing Stop", vwap_bleed_arm_pct=None, vwap_bleed_ticks=None, vwap_diff=None, vwap_breakdown_ticks=None, tp_threshold=None, vwap_bleed_multiplier=None, symphony_vol=None
+    symphony_name, current_return, prob_beating, stop_trigger_level, high_water_mark, is_live, discord_webhook_url, exit_reason="Trailing Stop", vwap_bleed_arm_pct=None, vwap_bleed_ticks=None, vwap_diff=None, vwap_breakdown_ticks=None, tp_threshold=None, vwap_bleed_multiplier=None, symphony_vol=None, prob_loss_dynamic=None, dynamic_floor=None
 ):
     if not discord_webhook_url:
         return
@@ -451,7 +451,10 @@ def send_discord_alert(
 
     title = f"{base_title}: {exit_reason} Triggered" if is_live else f"⚠️ [DRY RUN] {base_title}"
     color = live_color if is_live else 16766720
-    action_text = "Executed 'Sell to Cash' via API. Trade queued for Composer execution window." if is_live else "Bypassed (Dry Run Mode)"
+    if exit_reason != "Take-Profit":
+        action_text = "Sell-to-Cash Executed & Settlement Verified" if is_live else "Bypassed (Dry Run Mode)"
+    else:
+        action_text = "Executed 'Sell to Cash' via API. Trade queued for Composer execution window." if is_live else "Bypassed (Dry Run Mode)"
 
     fields = [
         {"name": "Symphony", "value": symphony_name, "inline": True},
@@ -461,6 +464,9 @@ def send_discord_alert(
         {"name": "MC Probability", "value": f"{prob_beating:.1f}%", "inline": True},
         {"name": "Action Taken", "value": action_text, "inline": False},
     ]
+
+    if exit_reason == "Trailing Stop" and prob_loss_dynamic is not None and dynamic_floor is not None:
+        fields.append({"name": "Downside Risk (Vol-Scaled)", "value": f"{prob_loss_dynamic:.1f}% chance of dropping below {dynamic_floor:.2f}%", "inline": False})
 
     if exit_reason == "VWAP Bleed Cut" and vwap_bleed_arm_pct is not None:
         bleed_val = f"Threshold: `{vwap_bleed_arm_pct}%`"
@@ -490,3 +496,23 @@ def send_discord_alert(
         requests.post(discord_webhook_url, json=payload, timeout=10)
     except Exception as e:
         print(f"!!! [DISCORD ERROR]: Failed to send alert: {e}")
+
+def send_circuit_breaker_alert(symphony_name, webhook_url):
+    if not webhook_url:
+        return
+
+    payload = {
+        "embeds": [
+            {
+                "title": "Manual Intervention Detected",
+                "color": 15548997,
+                "description": f"**{symphony_name}** is no longer active in Composer. Tracking has been safely suspended for the remainder of the session to protect API rate limits.",
+                "footer": {"text": "Alpha Bot • Circuit Breaker"}
+            }
+        ]
+    }
+    time.sleep(1)
+    try:
+        requests.post(webhook_url, json=payload, timeout=10)
+    except Exception as e:
+        print(f"!!! [DISCORD ERROR]: Failed to send circuit breaker alert: {e}")
