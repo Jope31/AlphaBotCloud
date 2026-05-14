@@ -230,15 +230,17 @@ def generate_synthetic_history(bot_state, current_date_str):
                         valid_alloc += alloc
                         
                 # Reduce neighbor_k and paths for speed, 300 paths is fine for tuning approximation
-                mc_prob = math_engine.run_monte_carlo(holdings, hist_data_up_to_yesterday, spy_today, 300, 5)
+		mc_prob, prob_loss_dynamic, dynamic_floor = math_engine.run_monte_carlo(holdings, hist_data_up_to_yesterday, spy_today, vol, 300, 5)
                 
                 ticks.append({
-                    "time": ts[11:16], 
-                    "return": agg_ret * 100.0,
-                    "mc_prob": mc_prob,
-                    "vol": vol,
-                    "vwap_diff": weighted_vwap_diff,
-                    "base_atr_pct": base_atr
+		    "time": ts[11:16], 
+		    "return": agg_ret * 100.0,
+		    "mc_prob": mc_prob,
+		    "prob_loss_dynamic": prob_loss_dynamic,
+		    "dynamic_floor": dynamic_floor,
+		    "vol": vol,
+		    "vwap_diff": weighted_vwap_diff,
+		    "base_atr_pct": base_atr
                 })
                 
             day_history[sym_id] = ticks
