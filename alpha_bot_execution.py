@@ -92,7 +92,7 @@ def fetch_symphony_stats(account_id):
         print(f"Exception fetching account {account_id}: {e}")
     return []
 
-def execute_sell_to_cash(actual_symphony_id, account_id):
+def execute_sell_to_cash(actual_symphony_id, account_id, bot_state=None, sym_id=None):
     url = f"{COMPOSER_BASE_URL}/deploy/accounts/{account_id}/symphonies/{actual_symphony_id}/go-to-cash"
     backoff_intervals = [1, 2, 4, 10]
     
@@ -105,6 +105,15 @@ def execute_sell_to_cash(actual_symphony_id, account_id):
                 time.sleep(0.5)
                 return True
                 
+            if response.status_code in [401, 404]:
+                print(f"     !!! [COMPOSER HTTP {response.status_code}]: Symphony not found/unauthorized. Circuit breaker tripped.")
+                if bot_state is not None and sym_id is not None:
+                    if isinstance(bot_state.get(sym_id), dict):
+                        bot_state[sym_id]["removed_by_user"] = True
+                        database.save_state(bot_state)
+                time.sleep(1.5)
+                return False
+
             if response.status_code == 429:
                 retry_after = int(response.headers.get("Retry-After", 60))
                 print(f"     !!! [RATE LIMIT HIT 429] Sleeping for {retry_after}s...")
@@ -389,21 +398,34 @@ def main():
                     if t and "cash" not in t.lower():
                         all_tickers.add(t)
 
-        # Garbage Collection: Clean up orphaned symphonies (Portfolio Sync)
+        # Garbage Collection & Circuit Breaker: Track missing symphonies (Portfolio Sync)
         active_symphony_ids = set()
         for account, symphonies in symphony_data_cache.items():
             for sym in symphonies:
                 active_symphony_ids.add(sym["id"])
 
-        orphans = []
         for s_id, s_data in bot_state.items():
-            if isinstance(s_data, dict) and s_id not in active_symphony_ids and not s_data.get("triggered", False):
-                orphans.append(s_id)
+            if not isinstance(s_data, dict):
+                continue
+            
+            if "missing_streak" not in s_data:
+                s_data["missing_streak"] = 0
+                
+            if not s_data.get("triggered", False):
+                if s_id not in active_symphony_ids:
+                    s_data["missing_streak"] += 1
+                    print(f"  -> [PORTFOLIO SYNC] Symphony {s_data.get('name', s_id)} missing from Composer. Streak: {s_data['missing_streak']}")
+                    state_changed = True
+                else:
+                    if s_data["missing_streak"] > 0:
+                        s_data["missing_streak"] = 0
+                        state_changed = True
 
-        for s_id in orphans:
-            print(f"  -> [PORTFOLIO SYNC] Removing orphaned symphony from state: {bot_state[s_id].get('name', s_id)}")
-            del bot_state[s_id]
-            state_changed = True
+            if s_data.get("missing_streak", 0) >= 2:
+                if not s_data.get("removed_by_user", False):
+                    print(f"  -> [CIRCUIT BREAKER] Symphony {s_data.get('name', s_id)} missing 2+ times. Flagging removed_by_user=True")
+                    s_data["removed_by_user"] = True
+                    state_changed = True
 
         if (market_close <= current_time <= post_mortem_cutoff) or (force_run and current_et.weekday() >= 5):
             if bot_state.get("post_mortem_run") == current_date_str:
@@ -415,6 +437,8 @@ def main():
             for account, symphonies in symphony_data_cache.items():
                 for sym in symphonies:
                     s_id = sym["id"]
+                    if bot_state.get(s_id, {}).get("removed_by_user"):
+                        continue
                     if s_id in bot_state:
                         if not bot_state[s_id].get("triggered"):
                             bot_state[s_id]["current_holdings"] = [
@@ -460,6 +484,9 @@ def main():
         for account, symphonies in symphony_data_cache.items():
             for sym in symphonies:
                 symphony_id = sym["id"]
+                if bot_state.get(symphony_id, {}).get("removed_by_user"):
+                    continue
+
                 actual_symphony_id = sym.get("symphony_id", symphony_id)
 
                 symphony_name = sym.get("name", "Unknown Symphony")
@@ -528,6 +555,7 @@ def main():
                         "vwap_bleed_ticks": 0,
                         "breakeven_locked": False,
                         "hwm_hold_ticks": 0,
+                        "missing_streak": 0,
                     }
 
                 prev_armed = bot_state[symphony_id].get("armed", False)
@@ -538,7 +566,7 @@ def main():
                 for key in ["triggered", "tp_armed", "breakeven_locked", "para_armed"]:
                     if key not in bot_state[symphony_id]:
                         bot_state[symphony_id][key] = False
-                for key in ["below_stop_count", "above_tp_count", "vwap_ticks", "vwap_bleed_ticks", "hwm_hold_ticks"]:
+                for key in ["below_stop_count", "above_tp_count", "vwap_ticks", "vwap_bleed_ticks", "hwm_hold_ticks", "missing_streak"]:
                     if key not in bot_state[symphony_id]:
                         bot_state[symphony_id][key] = 0
                 if "mc_history" not in bot_state[symphony_id]:
@@ -555,8 +583,8 @@ def main():
                 high_water_mark = bot_state[symphony_id]["high_water_mark"]
                 safe_hwm = high_water_mark if high_water_mark != -999.0 else current_return
 
-                prob_beating = math_engine.run_monte_carlo(holdings, historical_data, spy_today, SIMULATION_PATHS, NEIGHBOR_K)
                 symphony_vol = math_engine.calculate_20d_vol(holdings, historical_data)
+                prob_beating, prob_loss_dynamic = math_engine.run_monte_carlo(holdings, historical_data, spy_today, symphony_vol, SIMULATION_PATHS, NEIGHBOR_K)
 
                 raw_dynamic_bleed = -(symphony_vol * acc_VWAP_BLEED_MULTIPLIER)
                 acc_VWAP_BLEED_ARM_PCT = max(-3.0, min(-0.5, raw_dynamic_bleed))
@@ -564,9 +592,9 @@ def main():
                 should_arm = False
                 arm_reason = ""
 
-                if acc_TAKE_PROFIT_MC_PCT <= prob_beating < acc_TRIGGER_THRESHOLD_PCT:
+                if acc_TAKE_PROFIT_MC_PCT <= prob_beating < acc_TRIGGER_THRESHOLD_PCT and prob_loss_dynamic >= 25.0:
                     should_arm = True
-                    arm_reason = f"MC Prob {prob_beating:.1f}%"
+                    arm_reason = f"MC Prob {prob_beating:.1f}% | Loss Prob {prob_loss_dynamic:.1f}%"
 
                 if should_arm and not bot_state[symphony_id]["armed"] and not bot_state[symphony_id]["triggered"]:
                     bot_state[symphony_id]["armed"] = True
@@ -792,74 +820,142 @@ def main():
 
         # Process Execution Queue
         if execution_queue:
+            # Group by account to process polling per account
+            execution_by_account = {}
+            for item in execution_queue:
+                acc = item["account"]
+                if acc not in execution_by_account:
+                    execution_by_account[acc] = []
+                execution_by_account[acc].append(item)
+
             print(f"\nProcessing Execution Queue ({len(execution_queue)} items)...")
             
-            for i in range(0, len(execution_queue), 25):
-                chunk = execution_queue[i:i+25]
-                
-                if i > 0:
-                    print("  -> ⏳ Rate limit chunking: Sleeping for 60 seconds before next batch...")
-                    time.sleep(60)
-
-                for item in chunk:
-                    sym_id = item["symphony_id"]
-                    actual_id = item["actual_symphony_id"]
-                    account = item["account"]
-                    reason = item["reason"]
+            for account, account_queue in execution_by_account.items():
+                for i in range(0, len(account_queue), 25):
+                    chunk = account_queue[i:i+25]
                     
-                    sym_chart_data = chart_history["symphonies"].get(sym_id, [])
+                    if i > 0:
+                        print("  -> ⏳ Rate limit chunking: Sleeping for 60 seconds before next batch...")
+                        time.sleep(60)
 
-                    if LIVE_EXECUTION:
-                        print(f"  -> [LIVE EXECUTION] Sending sell-to-cash command for {item['symphony_name']}...")
-                        success = execute_sell_to_cash(actual_id, account)
-                    else:
-                        print(f"  -> [DRY RUN] Execution bypassed for {item['symphony_name']}.")
-                        success = True
-                    
-                    if success:
-                        bot_state[sym_id]["armed"] = False
-                        bot_state[sym_id]["tp_armed"] = False
-                        bot_state[sym_id]["triggered"] = True
-                        bot_state[sym_id]["triggered_reason"] = reason
-                        bot_state[sym_id]["triggered_at_return"] = item["current_return"]
-                        bot_state[sym_id]["triggered_at_hwm"] = item["safe_hwm"]
-                        bot_state[sym_id]["triggered_at_stop"] = item["attempted_level"]
-                        bot_state[sym_id]["triggered_at_time"] = current_time_str
-                        bot_state[sym_id]["high_water_mark"] = -999.0
+                    pending_liquidations = []
+                    pending_items = {}
 
-                        # Freeze ticker prices and basket snapshot
-                        trigger_prices = {}
-                        triggered_basket_snapshot = []
-                        for h in bot_state[sym_id].get("current_holdings", []):
-                            t = h.get("ticker")
-                            alloc = h.get("allocation", 0.0)
-                            price = 0.0
-                            if t in live_vwaps:
-                                price = live_vwaps[t]["last_price"]
-                                trigger_prices[t] = price
-                            triggered_basket_snapshot.append({
-                                "ticker": t,
-                                "allocation": alloc,
-                                "price": price
-                            })
-                        bot_state[sym_id]["trigger_prices"] = trigger_prices
-                        bot_state[sym_id]["triggered_basket_snapshot"] = triggered_basket_snapshot
+                    for item in chunk:
+                        sym_id = item["symphony_id"]
+                        actual_id = item["actual_symphony_id"]
+                        reason = item["reason"]
 
-                        if sym_chart_data:
-                            sym_chart_data[-1]["stop"] = item["attempted_level"]
-                            sym_chart_data[-1]["event"] = reason
+                        if LIVE_EXECUTION:
+                            print(f"  -> [LIVE EXECUTION] Sending sell-to-cash command for {item['symphony_name']}...")
+                            success = execute_sell_to_cash(actual_id, account, bot_state, sym_id)
+                        else:
+                            print(f"  -> [DRY RUN] Execution bypassed for {item['symphony_name']}.")
+                            success = True
+                        
+                        if success:
+                            pending_liquidations.append(sym_id)
+                            pending_items[sym_id] = item
+                        else:
+                            print(f"     !!! EXECUTION FAILED FOR {item['symphony_name']}. Skipping state update !!!")
+                            
+                    if pending_liquidations:
+                        print(f"  -> Polling for liquidation settlement for {len(pending_liquidations)} symphonies...")
+                        for poll_attempt in range(40):
+                            if not pending_liquidations:
+                                break
+                            
+                            current_symphonies = fetch_symphony_stats(account)
+                            sym_state_lookup = {s.get("id"): s for s in current_symphonies}
+                            
+                            verified_liquidations = []
+                            for pending_id in pending_liquidations:
+                                p_item = pending_items[pending_id]
+                                actual_sym_id = p_item["actual_symphony_id"]
+                                
+                                sym = sym_state_lookup.get(pending_id)
+                                if not sym:
+                                    sym = next((s for s in current_symphonies if s.get("symphony_id", s.get("id")) == actual_sym_id), None)
+                                
+                                is_liquidated = False
+                                if not sym:
+                                    # If not in the list, we can assume it was removed/fully liquidated
+                                    is_liquidated = True
+                                else:
+                                    val = sym.get("current_value", sym.get("value", 0.0))
+                                    holdings = sym.get("holdings", [])
+                                    
+                                    if val < 1:
+                                        is_liquidated = True
+                                    elif not holdings:
+                                        is_liquidated = True
+                                    else:
+                                        all_cash = True
+                                        for h in holdings:
+                                            ticker = h.get("ticker", "").upper()
+                                            if "$USD" not in ticker and "CASH" not in ticker:
+                                                all_cash = False
+                                                break
+                                        if all_cash:
+                                            is_liquidated = True
+                                            
+                                if is_liquidated or not LIVE_EXECUTION:
+                                    verified_liquidations.append(pending_id)
+                                    
+                            for v_id in verified_liquidations:
+                                pending_liquidations.remove(v_id)
+                                item = pending_items[v_id]
+                                reason = item["reason"]
+                                sym_chart_data = chart_history["symphonies"].get(v_id, [])
 
-                        reporting.send_discord_alert(
-                            item["symphony_name"], item["current_return"], item["prob_beating"], 
-                            item["stop_trigger_level"], item["safe_hwm"], LIVE_EXECUTION, DISCORD_WEBHOOK_URL, 
-                            exit_reason=reason, vwap_bleed_arm_pct=item["acc_VWAP_BLEED_ARM_PCT"], 
-                            vwap_bleed_ticks=item["acc_VWAP_BLEED_TICKS"], vwap_diff=item["weighted_vwap_diff"], 
-                            vwap_breakdown_ticks=item["vwap_ticks"], tp_threshold=item["acc_TAKE_PROFIT_MC_PCT"],
-                            vwap_bleed_multiplier=item.get("acc_VWAP_BLEED_MULTIPLIER"),
-                            symphony_vol=item.get("symphony_vol")
-                        )
-                    else:
-                        print(f"     !!! EXECUTION FAILED FOR {item['symphony_name']}. Skipping state update !!!")
+                                bot_state[v_id]["armed"] = False
+                                bot_state[v_id]["tp_armed"] = False
+                                bot_state[v_id]["triggered"] = True
+                                bot_state[v_id]["triggered_reason"] = reason
+                                bot_state[v_id]["triggered_at_return"] = item["current_return"]
+                                bot_state[v_id]["triggered_at_hwm"] = item["safe_hwm"]
+                                bot_state[v_id]["triggered_at_stop"] = item["attempted_level"]
+                                bot_state[v_id]["triggered_at_time"] = current_time_str
+                                bot_state[v_id]["high_water_mark"] = -999.0
+
+                                trigger_prices = {}
+                                triggered_basket_snapshot = []
+                                for h in bot_state[v_id].get("current_holdings", []):
+                                    t = h.get("ticker")
+                                    alloc = h.get("allocation", 0.0)
+                                    price = 0.0
+                                    if t in live_vwaps:
+                                        price = live_vwaps[t]["last_price"]
+                                        trigger_prices[t] = price
+                                    triggered_basket_snapshot.append({
+                                        "ticker": t,
+                                        "allocation": alloc,
+                                        "price": price
+                                    })
+                                bot_state[v_id]["trigger_prices"] = trigger_prices
+                                bot_state[v_id]["triggered_basket_snapshot"] = triggered_basket_snapshot
+
+                                if sym_chart_data:
+                                    sym_chart_data[-1]["stop"] = item["attempted_level"]
+                                    sym_chart_data[-1]["event"] = reason
+
+                                reporting.send_discord_alert(
+                                    item["symphony_name"], item["current_return"], item["prob_beating"], 
+                                    item["stop_trigger_level"], item["safe_hwm"], LIVE_EXECUTION, DISCORD_WEBHOOK_URL, 
+                                    exit_reason=reason, vwap_bleed_arm_pct=item["acc_VWAP_BLEED_ARM_PCT"], 
+                                    vwap_bleed_ticks=item["acc_VWAP_BLEED_TICKS"], vwap_diff=item["weighted_vwap_diff"], 
+                                    vwap_breakdown_ticks=item["vwap_ticks"], tp_threshold=item["acc_TAKE_PROFIT_MC_PCT"],
+                                    vwap_bleed_multiplier=item.get("acc_VWAP_BLEED_MULTIPLIER"),
+                                    symphony_vol=item.get("symphony_vol")
+                                )
+                                print(f"  -> [SETTLED] {item['symphony_name']} successfully moved to cash.")
+                                database.save_state(bot_state)
+                            
+                            if pending_liquidations:
+                                time.sleep(3)
+                                
+                        if pending_liquidations:
+                            print(f"     !!! TIMEOUT waiting for settlement on {len(pending_liquidations)} symphonies. They will retry or sync on next run.")
 
         database.save_state(bot_state)
         database.save_chart_history(chart_history)
