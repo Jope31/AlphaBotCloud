@@ -498,7 +498,7 @@ def main():
                 if bot_state.get(symphony_id, {}).get("removed_by_user"):
                     continue
 
-                actual_symphony_id = sym.get("symphony_id", symphony_id)
+                actual_symphony_id = symphony_id
 
                 symphony_name = sym.get("name", "Unknown Symphony")
                 normalized_name = database.normalize_name(symphony_name)
@@ -596,7 +596,7 @@ def main():
 
                 symphony_vol = math_engine.calculate_20d_vol(holdings, historical_data)
                 vol_mult = acc_params.get("VOLATILITY_MAGNITUDE_MULTIPLIER", 0.5)
-                prob_beating, prob_loss_dynamic, dynamic_floor = math_engine.run_monte_carlo(holdings, historical_data, spy_today, symphony_vol, SIMULATION_PATHS, NEIGHBOR_K, volatility_multiplier=vol_mult)
+                prob_beating, prob_loss_dynamic, dynamic_floor = math_engine.run_monte_carlo(current_return, holdings, historical_data, spy_today, symphony_vol, SIMULATION_PATHS, NEIGHBOR_K, volatility_multiplier=vol_mult)
 
                 acc_VWAP_BLEED_ARM_PCT = math_engine.calculate_vwap_bleed_threshold(symphony_vol, acc_VWAP_BLEED_MULTIPLIER)
 
