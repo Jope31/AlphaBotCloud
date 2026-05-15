@@ -841,6 +841,8 @@ def main():
                                 post_trigger_move += alloc * ((p_now - p_start) / p_start)
                                 
                     shadow_return = f_ret + (post_trigger_move * 100.0)
+                    s_data["current_return"] = shadow_return
+                    s_data["shadow_hwm"] = max(s_data.get("shadow_hwm", shadow_return), shadow_return)
                     
                     sym_chart_data = chart_history["symphonies"].setdefault(s_id, [])
                     tracked_stop = s_data.get("triggered_at_stop", -999.0)
