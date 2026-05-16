@@ -17,7 +17,9 @@ DEFAULT_STRATEGY = {
     "MAX_PARABOLIC_SQUEEZE": 0.50,
     "VWAP_BLEED_MULTIPLIER": 1.5,
     "VWAP_BLEED_TICKS": 10,
-    "VOLATILITY_MAGNITUDE_MULTIPLIER": 0.5
+    "VOLATILITY_MAGNITUDE_MULTIPLIER": 0.5,
+    "GAP_DEFENSE_THRESHOLD_PCT": 2.5,
+    "GAP_DEFENSE_MULTIPLIER": 0.5
 }
 
 # By default, we lock the non-user-specified variables so BO only tunes the requested
@@ -98,9 +100,11 @@ def wipe_transient_state(state_dict):
         if isinstance(s_data, dict):
             s_data["high_water_mark"] = -999.0
             s_data["shadow_hwm"] = -999.0
-            s_data["prev_return"] = 0.0
+            s_data["highest_stop_level"] = -999.0
+            s_data["prev_return"] = None
             s_data["armed"] = False
             s_data["tp_armed"] = False
+            s_data["gap_defense_locked"] = False
             s_data["para_armed"] = False
             s_data["triggered"] = False
             s_data["breakeven_locked"] = False
