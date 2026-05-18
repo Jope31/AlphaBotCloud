@@ -38,29 +38,17 @@ def generate_eod_snapshot(bot_state, current_date_str, is_post_rebalance=False, 
                 report["summary"]["total_triggered"] += 1
 
                 f_ret = sym.get("triggered_at_return", 0.0)
+                f_hwm = sym.get("triggered_at_hwm", sym.get("high_water_mark", 0.0))
 
-                triggered_basket = sym.get("triggered_basket_snapshot", [])
-                if triggered_basket and live_prices:
-                    post_trigger_move = 0.0
-                    for h in triggered_basket:
-                        t = h.get("ticker")
-                        alloc = h.get("allocation", 0.0)
-                        p_start = h.get("price", 0.0)
-                        if t in live_prices and p_start > 0:
-                            p_now = live_prices[t].get("last_price", 0.0)
-                            if p_now > 0:
-                                post_trigger_move += alloc * ((p_now - p_start) / p_start)
-                    basketReturnAtPreclose = f_ret + (post_trigger_move * 100.0)
-                else:
-                    basketReturnAtPreclose = sym.get("current_return", 0.0)
-
-                live_ret = basketReturnAtPreclose
-                saved_pct = f_ret - live_ret
+                # Pull the live-tracked shadow values directly from the Ghost Symphony bot state
+                shadow_return = sym.get("current_return", f_ret)
+                shadow_hwm = sym.get("shadow_hwm", f_hwm)
                 
+                guard_alpha = f_ret - shadow_return
                 sym_val = sym.get("current_value", 0.0)
-                saved_dollars = sym_val * (saved_pct / 100.0) if sym_val > 0 else 0.0
+                saved_dollars = (sym_val * (guard_alpha / 100.0))
 
-                if saved_pct > 0:
+                if guard_alpha > 0:
                     report["summary"]["positive_guard_alpha_count"] += 1
 
                 if f_ret == sym.get("triggered_at_stop"):
@@ -84,11 +72,11 @@ def generate_eod_snapshot(bot_state, current_date_str, is_post_rebalance=False, 
                         "exit_reason": exit_reason,
                         "exit_return": round(f_ret, 2),
                         "attempted_trigger_level": round(sym.get("triggered_at_stop", 0.0), 2),
-                        "shadow_return": round(live_ret, 2),
-                        "shadow_hwm": round(sym.get("shadow_hwm", 0.0), 2),
-                        "saved_pct_guard_alpha": round(saved_pct, 2),
+                        "shadow_return": round(shadow_return, 2),
+                        "shadow_hwm": round(shadow_hwm, 2),
+                        "saved_pct_guard_alpha": round(guard_alpha, 2),
                         "saved_dollars": round(saved_dollars, 2),
-                        "hwm_at_trigger": round(sym.get("triggered_at_hwm", 0.0), 2),
+                        "hwm_at_trigger": round(f_hwm, 2),
                         "time_triggered": sym.get("triggered_at_time", ""),
                         "symphony_vol": round(sym.get("symphony_vol", 0.0), 2),
                         "prob_loss_dynamic": round(sym["prob_loss_dynamic"], 2) if sym.get("prob_loss_dynamic") is not None else None,
