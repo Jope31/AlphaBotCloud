@@ -25,18 +25,20 @@ BREAKEVEN_ACTIVATION_BUFFER = 0.2
 VWAP_BLEED_FLOOR = -3.0
 VWAP_BLEED_CEILING = -0.5
 
-def run_monte_carlo(current_symphony_return, holdings, historical_data, spy_today_return, symphony_vol, simulation_paths=5000, neighbor_k=150, volatility_multiplier=0.5):
+def run_monte_carlo(current_symphony_return, holdings, historical_data, spy_today_return, proxy_today_return, symphony_vol, proxy_etf="SPY", simulation_paths=5000, neighbor_k=150, volatility_multiplier=0.5, w1=1.0, w2=1.0, w3=1.0):
     """
-    Vectorized Monte Carlo simulation using Nearest Neighbors matching.
+    Vectorized Monte Carlo simulation using Sector-Conditioned Nearest Neighbors matching (3D).
     Includes an unconditional bootstrap fallback.
     """
+    if not proxy_etf:
+        proxy_etf = "SPY"
     np.random.seed(42)
     valid_dates = sorted(list(historical_data.keys()))
     if len(valid_dates) < VOLATILITY_WINDOW_DAYS:
         return 100.0, 0.0, 0.0
 
     tickers = [h["ticker"] for h in holdings]
-    weights = np.array([h.get("allocation", 0.0) for h in holdings])
+    weights = np.array([h.get("weight", h.get("allocation", 0.0)) for h in holdings])
 
     # Step 1: Pre-compute portfolio returns for ALL valid dates
     all_returns_matrix = np.zeros((len(valid_dates), len(tickers)))
@@ -68,8 +70,9 @@ def run_monte_carlo(current_symphony_return, holdings, historical_data, spy_toda
     if spy_today_return is None or not isinstance(spy_today_return, (int, float)) or np.isnan(spy_today_return):
         return unconditional_prob_beating, unconditional_prob_loss_dynamic, dynamic_floor
 
-    # 1. Calculate distances based on SPY return and rolling 20-day volatility
+    # 1. Calculate distances based on SPY return, SectorProxy return, and rolling 20-day volatility
     spy_returns = np.array([historical_data[date].get("SPY", {}).get("daily_ret", 0.0) for date in valid_dates])
+    proxy_returns = np.array([historical_data[date].get(proxy_etf, {}).get("daily_ret", 0.0) for date in valid_dates])
     
     spy_vols = np.zeros_like(spy_returns)
     for i in range(len(spy_returns)):
@@ -80,13 +83,22 @@ def run_monte_carlo(current_symphony_return, holdings, historical_data, spy_toda
             spy_vols[i] = 0.0
             
     spy_today_ret_dec = spy_today_return / PERCENT_CONVERSION
+    if proxy_today_return is None or not isinstance(proxy_today_return, (int, float)) or np.isnan(proxy_today_return):
+        proxy_today_ret_dec = 0.0
+    else:
+        proxy_today_ret_dec = proxy_today_return / PERCENT_CONVERSION
+
     if len(spy_returns) >= VOLATILITY_INDEX_OFFSET:
         today_vol = np.std(np.append(spy_returns[-VOLATILITY_INDEX_OFFSET:], spy_today_ret_dec))
     else:
         today_vol = np.std(np.append(spy_returns, spy_today_ret_dec))
 
-    # Euclidean distance across 2 dimensions
-    distances = np.sqrt((spy_returns - spy_today_ret_dec)**2 + (spy_vols - today_vol)**2)
+    # Euclidean distance across 3 dimensions
+    distances = np.sqrt(
+        w1 * ((spy_returns - spy_today_ret_dec)**2) + 
+        w2 * ((proxy_returns - proxy_today_ret_dec)**2) + 
+        w3 * ((spy_vols - today_vol)**2)
+    )
     
     # 2. Get top K indices
     if len(distances) <= neighbor_k:
@@ -123,7 +135,7 @@ def calculate_20d_vol(holdings, historical_data):
         return 0.0
 
     tickers = [h.get("ticker") for h in holdings]
-    weights = np.array([h.get("allocation", 0.0) for h in holdings])
+    weights = np.array([h.get("weight", h.get("allocation", 0.0)) for h in holdings])
     
     returns_matrix = np.zeros((len(valid_dates), len(tickers)))
     
@@ -153,7 +165,7 @@ def calculate_14d_atr_pct(holdings, historical_data):
         return calculate_20d_vol(holdings, historical_data)
 
     tickers = [h.get("ticker") for h in holdings]
-    weights = np.array([h.get("allocation", 0.0) for h in holdings])
+    weights = np.array([h.get("weight", h.get("allocation", 0.0)) for h in holdings])
     
     atr_pct_array = np.zeros(len(tickers))
     
@@ -190,6 +202,79 @@ def calculate_14d_atr_pct(holdings, historical_data):
     portfolio_atr_pct = atr_pct_array.dot(weights)
     return float(portfolio_atr_pct)
 
+def calculate_14d_vwatr_pct(holdings, historical_data):
+    """
+    Calculates the 14-day Volume-Weighted ATR (VW-ATR) percentage for the holdings.
+    Falls back to calculate_20d_vol if data is missing.
+    """
+    all_dates = sorted(list(historical_data.keys()))
+    if len(all_dates) < ATR_WINDOW_DAYS + 20:
+        return calculate_20d_vol(holdings, historical_data)
+
+    valid_dates = all_dates[-ATR_WINDOW_DAYS:]
+
+    tickers = [h.get("ticker") for h in holdings]
+    weights = np.array([h.get("weight", h.get("allocation", 0.0)) for h in holdings])
+    
+    vwatr_pct_array = np.zeros(len(tickers))
+    
+    for j, ticker in enumerate(tickers):
+        vwtr_list = []
+        last_close = None
+        has_missing_data = False
+        
+        for date in valid_dates:
+            date_idx = all_dates.index(date)
+            # Need 20 previous days INCLUDING the current date (as per typical SMA for RVol)
+            sma_dates = all_dates[date_idx - 19 : date_idx + 1]
+            if len(sma_dates) < 20:
+                has_missing_data = True
+                break
+                
+            vol_sum = 0
+            for d in sma_dates:
+                day_data = historical_data[d].get(ticker)
+                if not day_data or "volume" not in day_data:
+                    has_missing_data = True
+                    break
+                vol_sum += day_data["volume"]
+                
+            if has_missing_data:
+                break
+                
+            sma_vol = vol_sum / 20.0
+            
+            day_data = historical_data[date].get(ticker)
+            if not day_data or "high" not in day_data or "low" not in day_data or "close" not in day_data or "volume" not in day_data:
+                has_missing_data = True
+                break
+                
+            today_vol = day_data["volume"]
+            rvol = (today_vol / sma_vol) if sma_vol > 0 else 1.0
+            
+            high = day_data["high"]
+            low = day_data["low"]
+            close = day_data["close"]
+            
+            if last_close is not None:
+                tr = max(high - low, abs(high - last_close), abs(low - last_close))
+                vwtr = tr * rvol
+                vwtr_list.append(vwtr)
+            last_close = close
+            
+        if has_missing_data or len(vwtr_list) == 0:
+            return calculate_20d_vol(holdings, historical_data)
+            
+        avg_vwtr = np.mean(vwtr_list)
+        recent_close = last_close
+        if recent_close and recent_close > 0:
+            vwatr_pct_array[j] = (avg_vwtr / recent_close) * PERCENT_CONVERSION
+        else:
+            return calculate_20d_vol(holdings, historical_data)
+            
+    portfolio_vwatr_pct = vwatr_pct_array.dot(weights)
+    return float(portfolio_vwatr_pct)
+
 def check_parabolic_velocity(current_return, prev_return, threshold):
     return (current_return - prev_return) >= threshold
 
@@ -211,3 +296,42 @@ def check_breakeven_activation(current_return, symphony_vol):
 
 def calculate_vwap_bleed_threshold(symphony_vol, bleed_multiplier):
     return max(VWAP_BLEED_FLOOR, min(VWAP_BLEED_CEILING, -(symphony_vol * bleed_multiplier)))
+
+def calculate_current_rvol(holdings, historical_data):
+    all_dates = sorted(list(historical_data.keys()))
+    if len(all_dates) < 20:
+        return 1.0
+        
+    tickers = [h.get("ticker") for h in holdings]
+    weights = np.array([h.get("weight", h.get("allocation", 0.0)) for h in holdings])
+    
+    rvol_array = np.zeros(len(tickers))
+    
+    for j, ticker in enumerate(tickers):
+        date = all_dates[-1]
+        date_idx = all_dates.index(date)
+        sma_dates = all_dates[date_idx - 19 : date_idx + 1]
+        if len(sma_dates) < 20:
+            rvol_array[j] = 1.0
+            continue
+            
+        vol_sum = 0
+        for d in sma_dates:
+            day_data = historical_data[d].get(ticker)
+            if not day_data or "volume" not in day_data:
+                vol_sum = -1
+                break
+            vol_sum += day_data["volume"]
+            
+        if vol_sum < 0:
+            rvol_array[j] = 1.0
+            continue
+            
+        sma_vol = vol_sum / 20.0
+        day_data = historical_data[date].get(ticker)
+        today_vol = day_data["volume"]
+        rvol_array[j] = (today_vol / sma_vol) if sma_vol > 0 else 1.0
+        
+    portfolio_rvol = rvol_array.dot(weights)
+    return float(portfolio_rvol)
+
