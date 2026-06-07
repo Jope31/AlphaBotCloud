@@ -30,7 +30,7 @@ def fetch_bars(tickers_list, start_str, end_str, timeframe="1Day"):
     for i in range(0, len(tickers_list), batch_size):
         batch = tickers_list[i : i + batch_size]
         symbol_string = ",".join(batch)
-        print(f"      -> Fetching {timeframe} bars batch {i // batch_size + 1}/{len(tickers_list)//batch_size + 1}...")
+        print(f"      -> Fetching {timeframe} bars batch {i // batch_size + 1}/{len(tickers_list)//batch_size + 1}...", flush=True)
 
         page_token = None
         while True:
@@ -46,17 +46,17 @@ def fetch_bars(tickers_list, start_str, end_str, timeframe="1Day"):
                         success = True
                         break
                     elif response.status_code == 429:
-                        print(f"      -> Rate limit hit (429). Sleeping for 15s... (Attempt {attempt+1}/10)")
+                        print(f"      -> Rate limit hit (429). Sleeping for 15s... (Attempt {attempt+1}/10)", flush=True)
                         time.sleep(15)
                     else:
-                        print(f"      -> API Error {response.status_code}: {response.text}")
+                        print(f"      -> API Error {response.status_code}: {response.text}", flush=True)
                         time.sleep(5)
                 except Exception as e:
-                    print(f"      -> Request Exception: {e}")
+                    print(f"      -> Request Exception: {e}", flush=True)
                     time.sleep(5)
 
             if not success:
-                print(f"      -> Failed to fetch batch {i // batch_size + 1} after 10 attempts. Aborting.")
+                print(f"      -> Failed to fetch batch {i // batch_size + 1} after 10 attempts. Aborting.", flush=True)
                 break
 
             data = response.json()
@@ -74,8 +74,8 @@ def fetch_bars(tickers_list, start_str, end_str, timeframe="1Day"):
     return all_data
 
 def generate_synthetic_history(bot_state, current_date_str):
-    print("  -> [TELEMETRY] Starting Synthetic History Generation...")
-    print("  -> Generating Synthetic Forward-Looking Intraday History...")
+    print("  -> [TELEMETRY] Starting Synthetic History Generation...", flush=True)
+    print("  -> Generating Synthetic Forward-Looking Intraday History...", flush=True)
     
     # 1. Extract tickers
     all_tickers = set()
@@ -100,12 +100,12 @@ def generate_synthetic_history(bot_state, current_date_str):
     cache_file = os.path.join(cache_dir, f"synthetic_history_{current_date_str}_{holdings_hash}.json")
     
     if os.path.exists(cache_file):
-        print(f"  -> Loading cached synthetic history from {cache_file}...")
+        print(f"  -> Loading cached synthetic history from {cache_file}...", flush=True)
         try:
             with open(cache_file, "r") as f:
                 return json.load(f)
         except Exception as e:
-            print(f"  -> Cache load failed: {e}. Regenerating...")
+            print(f"  -> Cache load failed: {e}. Regenerating...", flush=True)
 
     tickers_list = list(all_tickers)
     for sym_id, state in bot_state.items():
@@ -317,14 +317,10 @@ def generate_synthetic_history(bot_state, current_date_str):
                 if proxy_etf in historical_daily.get(date_str, {}):
                     proxy_today = historical_daily[date_str][proxy_etf].get("daily_ret", 0.0) * 100.0
                     
-                w1 = strat_data.get("params", {}).get("MC_W1", 1.0)
-                w2 = strat_data.get("params", {}).get("MC_W2", 1.0)
-                w3 = strat_data.get("params", {}).get("MC_W3", 1.0)
-
                 mc_prob, prob_loss_dynamic, dynamic_floor = math_engine.run_monte_carlo(
                     agg_ret * 100.0, holdings, hist_data_up_to_yesterday, spy_today, proxy_today, 
                     vol, proxy_etf=proxy_etf, simulation_paths=300, neighbor_k=25, 
-                    volatility_multiplier=vol_mult, w1=w1, w2=w2, w3=w3
+                    volatility_multiplier=vol_mult
                 )
                 
                 ticks.append({
@@ -342,8 +338,8 @@ def generate_synthetic_history(bot_state, current_date_str):
             
         return date_str, day_history
 
-    print(f"  -> [TELEMETRY] Processing synthetic ticks for {len(intraday_dates)} days...")
-    print(f"  -> Simulating {len(intraday_dates)} days of Intraday Tick Data using Parallel Processing...")
+    print(f"  -> [TELEMETRY] Processing synthetic ticks for {len(intraday_dates)} days...", flush=True)
+    print(f"  -> Simulating {len(intraday_dates)} days of Intraday Tick Data using Parallel Processing...", flush=True)
     results = Parallel(n_jobs=-1)(delayed(process_day)(d) for d in intraday_dates)
     
     for date_str, day_history in results:
@@ -355,6 +351,6 @@ def generate_synthetic_history(bot_state, current_date_str):
         with open(cache_file, "w") as f:
             json.dump(history_125d, f)
     except Exception as e:
-        print(f"  -> Failed to write cache file: {e}")
+        print(f"  -> Failed to write cache file: {e}", flush=True)
                 
     return history_125d
