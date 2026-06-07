@@ -1,4 +1,26 @@
-# AlphaBot v3.5
+## Deprecation Summary & Rationale
+
+To streamline the optimization search space and protect the engine from overfitting past noise, the variable architecture has been condensed from 18 bloated items down to **7 core tactical levers**. The following mechanisms have been completely deprecated or locked as static constants:
+
+* **VWAP Bleed Cut (System B):** Deprecated `VWAP_BLEED_MULTIPLIER`, `VWAP_BLEED_TICKS`, and `VWAP_BLEED_DECAY_RATE`. Slow-drift intraday asset bleeding is now captured more organically by the newly integrated **Breakeven Path B (MC-Stuck Override)**, rendering an independent secondary volume-bleed structure redundant.
+
+
+* **Morning Gap Defense:** Deprecated `GAP_DEFENSE_THRESHOLD_PCT` and `GAP_DEFENSE_MULTIPLIER`. An overnight gap-up is mathematically a high-velocity vertical move occurring at market open. The standard **Parabolic Squeeze Ratchet** now natively intercepts these moves without needing a separate standalone system.
+
+
+* **Catastrophic Drop Protocol:** Deprecated `CATASTROPHIC_DROP_PCT`. Rapid structural drawdowns are handled by standard Monte Carlo arming bounds combined with the new independent timestamped Breakeven Lock protections.
+
+
+* **Monte Carlo KNN Distance Weights:** `MC_W1`, `MC_W2`, and `MC_W3` have been removed from the optimization space and locked as absolute static constraints ($1.0$). This prevents the autotuner from curve-fitting the basic physics of the simulation to past noise.
+
+
+* **Breakeven Volatility Bounds:** `BREAKEVEN_VOL_MIN` and `BREAKEVEN_VOL_MAX` have been deprecated from tuning parameters and hardcoded directly to fixed structural boundaries ($0.4\%$ and $3.0\%$).
+
+
+
+---
+
+# AlphaBot v4.0
 
 ## Summary
 
@@ -13,162 +35,190 @@ AlphaBot achieves its goals through a sophisticated combination of data ingestio
 ### **Live Data Ingestion & Regime Detection**
 
 * **Alpaca API Integration:** Fetches real-time, 1-minute historical and live pricing data for all active holdings across user portfolios. It utilizes parallel processing and local caching to rapidly generate synthetic intraday history.
-* **Dynamic Sector-Conditioned Macro Environment:** Filters the historical Monte Carlo dataset to only use days that closely match today's benchmark performance. The system features a semantic name resolution engine that dynamically assigns the most accurate proxy ETF (SPY, QQQ, IWM, DIA) to a symphony based on its top holdings, preserving highly accurate cross-asset correlations. *(NEW) Features a fully vectorized dual-mode unconditional bootstrap fallback to maintain resilience during unprecedented black swan events or data provider failures.*
+
+
+* **Dynamic Sector-Conditioned Macro Environment:** Filters the historical Monte Carlo dataset to only use days that closely match today's benchmark performance. The system features a semantic name resolution engine that dynamically assigns the most accurate proxy ETF (SPY, QQQ, IWM, DIA) to a symphony based on its top holdings, preserving highly accurate cross-asset correlations. Features a fully vectorized dual-mode unconditional bootstrap fallback to maintain resilience during unprecedented black swan events or data provider failures.
+
+
 
 ### **The Multi-Layered Risk Engine**
 
 * **Volatility-Adjusted Risk Sizing (VW-ATR):** Calculates an active trailing stop distance based strictly on the portfolio's 14-day Volume-Weighted Average True Range (VW-ATR), falling back to 20-day standard deviation if granular intraday metrics are unavailable.
+
+
 * **Strict Monotonicity Ratchet:** Mathematically enforces that a trailing stop can never drop or move backwards tick-to-tick, safely ratcheting the absolute stop level upward even during sudden intraday volatility spikes.
-* **Logarithmic Time Squeeze:** Shrinks the trailing stop distance smoothly and predictably based on the time of day using a logarithmic decay curve. The dynamic multiplier decays from 1.5x at the open to 0.5x by the close.
-* **Morning Gap Defense:** Instantly detects exceptional overnight gap-ups on the opening tick using the `GAP_DEFENSE_THRESHOLD_PCT`. If triggered, it permanently locks into a high-alert protection mode, tightening the trailing stop using the `GAP_DEFENSE_MULTIPLIER` for the remainder of the session to maximize windfall retention without confusing active intraday momentum logic.
-* **Parabolic Squeeze Ratchet:** Measures tick-by-tick *intraday* return velocity (explicitly decoupled from overnight gaps). If the velocity exceeds the `PARABOLIC_VELOCITY_THRESHOLD`, the engine permanently ratchets the trailing stop tighter using the `MAX_PARABOLIC_SQUEEZE` multiplier to protect the peak.
-* **Risk Guard (Breakeven Lock):** To lock the absolute downside floor to breakeven (0.0%), the live return must hold above a dynamically calculated activation threshold (clamped between 0.4% and 3.0%) for 5 consecutive ticks.
-* **Monte Carlo State Engine:** Runs thousands of vectorized, deterministic Monte Carlo simulations to calculate the probability of the symphony beating its current return, as well as evaluating a dynamic, volatility-scaled downside magnitude gate to filter out false-positive arms. It dictates state-switching by arming defensive trailing stops when the probability falls below the `TRIGGER_THRESHOLD_PCT` and triggering take-profit traps when it falls below the `TAKE_PROFIT_MC_PCT`.
-* **(UPDATED) Volatility-Scaled VWAP Defenses:** Implements a dual-system VWAP defense. System A (VWAP Breakdown) forces exits if the portfolio price drops below its VWAP after hitting a high-water mark. System B (VWAP Bleed Cut) dynamically calculates a stop floor using a `VWAP_BLEED_MULTIPLIER` applied to the asset's 20-day volatility, safely clamped between -0.50% and -3.0%, to amputate bleeding assets without being whipsawed by noise.
-* **(NEW) Catastrophic Drop Protocol:** Bypasses standard Monte Carlo sanity gates if a massive, sudden magnitude drop (defined by `CATASTROPHIC_DROP_PCT`) occurs, forcing an immediate trailing stop exit to protect capital during black swan intraday flashes.
-* **Strict Exit Confirmation:** Standard trailing stops require 3 consecutive ticks below the stop line (with a 0.10% magnitude floor) AND a Monte Carlo sanity gate check (probability under 60.0, alongside downside risk verifications) to prevent premature exits on market noise.
+
+
+* **Logarithmic Time Squeeze:** Shrinks the trailing stop distance smoothly and predictably based on the time of day using an accelerating logarithmic decay curve. The dynamic multiplier decays from your open parameter (`VOLATILITY_MAGNITUDE_MULTIPLIER`) to your close parameter (`VOLATILITY_CLOSE_MULTIPLIER`) near the bell.
+
+
+* **Parabolic Squeeze Ratchet:** Measures tick-by-tick *intraday* return velocity. If the velocity exceeds the `PARABOLIC_VELOCITY_THRESHOLD`, the engine permanently ratchets the trailing stop tighter using the `MAX_PARABOLIC_SQUEEZE` multiplier to protect the peak.
+
+
+* **Hybrid Dual-Path Breakeven Lock:** To lock the absolute downside floor to breakeven ($0.0\%$), live return must hold above a dynamically scaled activation threshold (clamped between $0.4\%$ and $3.0\%$) for 5 ticks. Once locked, it deploys **Path A** (Live-MC sanity filtering) alongside **Path B** (Persistent UTC timestamped `lock_engaged_at` override) to catch structural "MC-Stuck" slow-drift down days.
+
+
+* **Monte Carlo State Engine:** Runs thousands of vectorized, deterministic Monte Carlo simulations to calculate the probability of the symphony beating its current return, arming defensive trailing stops when the probability falls below the `TRIGGER_THRESHOLD_PCT`.
+
+
+* **Un-Gated Take-Profit MC Reversal:** Tracks extreme top-of-distribution thresholds via `TAKE_PROFIT_MC_PCT`. Reversion exits execute immediately upon cross-confirmation regardless of absolute return sign, capturing high-statistical relative peaks on macro down-days.
+
+
+* **Institutional VWAP Breakdown:** Forces tactical exits if the portfolio price drops below its volume-weighted average price pool for 3 consecutive ticks after hitting an established high-water mark threshold defined by `VWAP_CROSS_HWM_PCT`.
+
+
+* **Strict Exit Confirmation:** Standard trailing stops require 3 consecutive ticks below the stop line with a $0.10\%$ magnitude floor and an active Monte Carlo sanity gate check to eliminate premature exits on minor noise.
+
+
 
 ### **Symphony-Level Database Architecture**
 
 * **SQLite State Management:** Uses a highly concurrent SQLite database to store states, isolated risk parameters, execution locks, and continuous chart histories.
+
+
 * **Symphony-Level Strategies:** Maintains independent parameter tuning and variable locks based on unique, normalized symphony names.
-* **(NEW) Ecosystem Flush & Synchronization:** An intelligent "clean slate" protocol that allows users to seamlessly prune ghost tracking counters and dropped symphonies while perfectly preserving the tuned mathematical parameters for re-invested strategies.
-* **(NEW) Automated Portfolio Sync (Garbage Collection):** Automatically detects and prunes orphaned strategies removed from Composer during rebalances to keep the execution loop and autotuner highly optimized.
-* **Persistent Daily Logging:** Captures specific event logs (e.g., arming, triggers, execution) for each symphony into persistent local daily files (`symphony_logs_YYYY-MM-DD.json`), ensuring all historical intraday actions are permanently auditable.
+
+
+* **Ecosystem Flush & Synchronization:** An intelligent "Sync & Flush Portfolio" clean-slate protocol allowing users to seamlessly prune ghost tracking counters and dropped symphonies over the weekend while preserving finely-tuned parameters.
+
+
+* **Automated Portfolio Sync (Garbage Collection):** Automatically detects and prunes orphaned strategies removed from Composer during rebalances to keep the execution loop and autotuner highly optimized.
+
+
+* **Persistent Daily Logging:** Captures specific event logs for each symphony into persistent local daily files (`symphony_logs_YYYY-MM-DD.json`), ensuring all historical intraday actions are permanently auditable.
+
+
 
 ### **Automated Execution & Alerting**
 
 * **Gatekeeper & Scheduler:** A fully internal Flask-based daemon process using the `schedule` library runs the bot every minute during market hours, removing reliance on external cron jobs.
-* **Smart Liquidation Verification:** Rather than blindly assuming an HTTP API response means instant execution, the bot queues pending liquidations and utilizes a rate-limit-optimized batched polling loop to verify actual settlement into cash via the Composer API before updating its internal database state.
-* **(UPDATED) Per-Symphony Circuit Breaker:** Intelligently tracks a "missing streak" to detect manual user interventions. If a user manually liquidates a symphony on Composer mid-day, the bot safely traps the resulting API errors, flags the basket, and permanently suspends tracking for that session to protect rate limits.
-* **Composer API Trigger:** Fires a POST request to Composer's backend, liquidating a symphony to cash if the stop level is hit. It utilizes an exponential backoff retry mechanism (1, 2, 4, 10 seconds) to ensure resilience against rate limits (HTTP 429) and network spikes.
-* **Discord Webhooks (Multi-Embed):** Instantly sends a clean, multi-embed payload detailing the exit reason, Guard Alpha metrics, VWAP stats, and a summary chart powered by QuickChart. The EOD reports now feature multi-timeframe performance statistics (1d, 7d, 30d rolling windows) to evaluate long-term win rates and saved capital.
+
+
+* **Smart Liquidation Verification:** Queues pending liquidations and utilizes a rate-limit-optimized batched polling loop to verify actual settlement into cash via the Composer API before updating internal state.
+
+
+* **Per-Symphony Circuit Breaker:** Intelligently tracks a "missing streak" to detect manual user interventions. If a user manually liquidates a symphony on Composer mid-day, the bot safely traps the resulting errors, flags the basket, and suspends tracking for that session.
+
+
+* **Discord Webhooks (Multi-Embed):** Instantly sends structured embed payloads detailing execution metrics, dynamic parameters, and custom color-coded alerts (Green for profit, Orange for trailing breaches, Blue for Breakeven Lock triggers).
+
+
 
 ### **EOD Autotuning & Post-Mortem Analytics**
 
-* **Two-Stage EOD Pipeline:** Generates a daily post-mortem JSON snapshot using a two-stage process to prevent Composer API cash flatlines from corrupting the math. Stage 1 locks true shadow returns and Guard Alpha using live Alpaca pricing precisely at 15:53 ET. Stage 2 runs at 16:00 ET to inject tomorrow's target holdings without overwriting the previously locked math.
-* **Persistent Optimization Engine:** Performs a 125-trading-day Walk-Forward Analysis using an 80% Train / 20% Out-of-Sample test split. Powered by Optuna with a persistent SQLite backend, it runs 500 parallel trials per unique symphony name (with isolated daily studies) to tune dynamic stops, multipliers, and parabolic thresholds. It actively penalizes missed upside and peak-to-exit drawdowns, and dynamically respects UI-locked variables. If the out-of-sample validation fails, the bot safely reverts to fallback parameters or global defaults.
-* **Historical Slippage Profiling:** The Autotuner dynamically calculates historical execution deviation (slippage) across the previous 45 days, categorized by exit reason (e.g., VWAP Breakdown vs. Trailing Stop), injecting these penalties into the walk-forward simulation to guarantee conservative, realistic optimization.
+* **Two-Stage EOD Pipeline:** Generates a daily post-mortem snapshot by locking shadow returns via live Alpaca pricing at 15:53 ET (Stage 1) before injecting tomorrow's target holdings at 16:00 ET (Stage 2) to protect data integrity.
 
-### **(UPDATED) Interactive Control Center (UI/UX)**
 
-* **Live Dashboard:** A real-time Flask command center to view the exact distance to the stop level, status ranks, active EOD chart data, and **True Shadow Returns** (accurately tracking what the portfolio would have returned if held, even after exiting to cash).
-* **Performance Benchmarking:** An advanced visual benchmark dashboard that mathematically compares the active algorithmic strategy ("strat_series") against a static buy-and-hold baseline ("held_series") across Individual, Roth, and Traditional accounts, displaying total capital saved in USD.
-* **Daily History Explorer:** A dedicated two-pane modal allowing users to intuitively navigate and investigate historical trigger events and execution logs for any symphony on any given day.
-* **Settings Control Panel:** A dedicated API endpoint and UI structure to update `.env` globals and SQLite symphony strategies on the fly without restarting the application.
-* **Manual Overrides:** Includes API triggers to force an immediate run, force an EOD analysis computation, initiate a portfolio ecosystem overhaul, force a Discord push, or manually trigger an immediate account liquidation to cash.
+* **Lean 7-Variable Walk-Forward Engine:** Performs a 125-trading-day Walk-Forward Analysis (80% Train / 20% Out-of-Sample) running 500 parallel trials via Optuna per unique symphony name. The objective function penalizes missed upside, tracks historical execution slippage over 45 days, and forces **Optimization-Driven Disables** (`TRIGGER_THRESHOLD_PCT = 0.0`) if the MC arm is generating net-negative training alpha.
+
+
 
 ---
 
 ## Variables Explanation
 
-The bot's operation is customized through various variables set in the `.env` file and managed via the web Settings panel. Symphony-specific parameters can be isolated and tuned independently.
-
 ### API Keys and Identifiers
 
 * **`COMPOSER_KEY_ID`** & **`COMPOSER_SECRET`**: Authentication credentials for the Composer API.
+
+
 * **`ACCOUNT_INDIVIDUAL`**, **`ACCOUNT_ROTH`**, **`ACCOUNT_TRAD`**: Your Composer Account UUIDs separated by account type.
-* **`ACCOUNT_INDIVIDUAL_ENABLED`**, **`ACCOUNT_ROTH_ENABLED`**, **`ACCOUNT_TRAD_ENABLED`**: Boolean toggles (`True`/`False`) to enable or disable active live execution on a per-account basis.
-* **`ALPACA_KEY`** & **`ALPACA_SECRET`**: Alpaca API credentials used to fetch real-time and historical market data.
-* **`DISCORD_WEBHOOK_URL`**: The Discord webhook URL where the bot will send execution alerts and post-mortem reports.
+
+
+* **`ACCOUNT_INDIVIDUAL_ENABLED`**, **`ACCOUNT_ROTH_ENABLED`**, **`ACCOUNT_TRAD_ENABLED`**: Toggles (`True`/`False`) to enable or disable active live execution on a per-account basis.
+
+
+* **`ALPACA_KEY`** & **`ALPACA_SECRET`**: Alpaca API credentials used to fetch market data.
+
+
+* **`DISCORD_WEBHOOK_URL`**: Webhook URL where the bot sends alerts and reports.
+
+
 
 ### Master Control
 
-* **`LIVE_EXECUTION`**: A boolean switch (`True`/`False`). Set to `False` to run the bot in paper/simulation mode (Safe). Set to `True` to allow the bot to send live "sell-to-cash" requests (Danger).
-* **`EXECUTION_START_TIME`**: The time (e.g., `09:30`) when the bot begins monitoring and calculating live stops.
+* **`LIVE_EXECUTION`**: Toggle (`True`/`False`). Set to `False` to run in paper/simulation mode (Safe); set to `True` to allow live "sell-to-cash" execution via API.
 
-### Algorithm Parameters
 
-* **`TRIGGER_THRESHOLD_PCT`**: The primary Monte Carlo threshold (e.g., 15.0) that triggers the initial "Trailing Stop" arming.
-* **`TAKE_PROFIT_MC_PCT`**: The target Monte Carlo probability threshold (e.g., 5.0) to activate aggressive "Take Profit" arming on exceptional gains.
-* **`MAX_SQUEEZE_FLOOR`**: The absolute tightest the stop distance can shrink during peak logarithmic decay.
-* **`CATASTROPHIC_DROP_PCT`**: The exact threshold (e.g., 0.75) where a sudden magnitude drop forces an immediate exit, bypassing verification gates.
-* **`VWAP_CROSS_HWM_PCT`**: The return threshold an asset must hit to activate the VWAP Breakdown (System A) logic.
-* **`VWAP_BLEED_MULTIPLIER`**: The dynamic multiplier applied to a symphony's volatility to establish its maximum VWAP Bleed Cut threshold.
-* **`VWAP_BLEED_TICKS`**: The number of consecutive ticks required below the calculated bleed threshold before liquidating (System B).
-* **`GAP_DEFENSE_THRESHOLD_PCT`**: The minimum overnight gap-up return required to trigger the Morning Gap Defense protocol.
-* **`GAP_DEFENSE_MULTIPLIER`**: The severity of the stop squeeze applied to the trailing stop distance once the Morning Gap Defense is locked.
-* **`PARABOLIC_VELOCITY_THRESHOLD`**: The threshold of upward intraday return velocity required to trigger the permanent "Parabolic Squeeze" ratchet.
-* **`MAX_PARABOLIC_SQUEEZE`**: The stop squeeze multiplier applied continuously once the Parabolic Squeeze is armed or the breakeven lock is achieved.
+* **`EXECUTION_START_TIME`**: The time (e.g., `09:30`) when the bot begins monitoring live stops.
+
+
+
+### The 7 Core Optimized Algorithm Parameters
+
+The optimization engine restricts its dynamic walk-forward search space to these 7 core tactical variables, allowing Optuna to cover maximum ground and discover stable parameters without overfitting to historical noise. (Note: While `TRIGGER_THRESHOLD_PCT` exists in the codebase as an 8th variable, it is hardlocked by default as a global structural control, leaving these 7 to be actively tuned.)
+
+* **`TAKE_PROFIT_MC_PCT`:** The target Monte Carlo probability threshold used to activate un-gated take-profit trailing stop traps on exceptional intraday gains.
+
+
+* **`VWAP_CROSS_HWM_PCT`:** The exact return percentage a symphony must cross to activate institutional volume-pool breakdown tracking.
+
+
+* **`VWAP_BAND_MULTIPLIER`:** Scales your asset's volatility to establish a localized volume buffer zone, ensuring the bot ignores minor wiggles above or below the institutional VWAP pool.
+
+
+* **`VOLATILITY_MAGNITUDE_MULTIPLIER`:** The morning multiplier applied to the symphony's trailing stop width, keeping stops wide and forgiving during opening auction noise.
+
+
+* **`VOLATILITY_CLOSE_MULTIPLIER`:** The target multiplier applied to the end-of-day stop width, defining how tightly the accelerating logarithmic curve chokes the trailing stop near market close.
+
+
+* **`PARABOLIC_VELOCITY_THRESHOLD`**: The specific minute-by-minute return velocity required to arm a parabolic vertical surge protection mode.
+
+
+* **`MAX_PARABOLIC_SQUEEZE`:** The aggressive compression multiplier applied continuously to shrink your trailing stop distance whenever a parabolic squeeze is triggered or a breakeven lock is achieved.
+
+
 
 ---
 
 ## Installation Guide
 
 1. **Clone the repository and enter the directory**
-
-```
+```bash
 git clone https://github.com/Jope31/AlphaBot.git
 cd AlphaBot
 
 ```
 
-2. **Create and activate a virtual environment (Recommended)**
-
-
-
-
-This keeps the bot's dependencies isolated from your system Python.
-
-* **On Mac/Linux:**
-
-```
+2.  **Create and activate a virtual environment**
+* **Mac/Linux:**
+```bash
 python3 -m venv venv
 source venv/bin/activate
-
 ```
 
-* **On Windows:**
-
-```
-python -m venv venv
-venv\Scripts\activate
-
+* **Windows:**
+```bash
+    python -m venv venv
+    venv\Scripts\activate
 ```
 
-3. **Configure the Environment Variables:**
-
-
-
-
-Create or open the `.env` file and input your specific credentials:
-
-* Add your Composer Key, Secret, and Account UUIDs for each portfolio type.
-* Add your Alpaca Key and Secret.
-* Paste your Discord Webhook URL (how to: [https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks)).
-* Adjust initial global algorithm parameters as needed.
-
-
-
-*These are also editable from the "Settings" window on the Dashboard.*
-
+3.  **Configure Environment Variables**
+    Create a `.env` file matching your account parameters:
 ```env
-COMPOSER_KEY_ID=
-COMPOSER_SECRET=
-ACCOUNT_INDIVIDUAL=
-ACCOUNT_INDIVIDUAL_ENABLED=True
-ACCOUNT_ROTH=
-ACCOUNT_ROTH_ENABLED=True
-ACCOUNT_TRAD=
-ACCOUNT_TRAD_ENABLED=True
-ALPACA_KEY=
-ALPACA_SECRET=
-DISCORD_WEBHOOK_URL=
-LIVE_EXECUTION=False
-EXECUTION_START_TIME=09:31
-
+    COMPOSER_KEY_ID=your_composer_key
+    COMPOSER_SECRET=your_composer_secret
+    ACCOUNT_INDIVIDUAL=your_uuid_1
+    ACCOUNT_INDIVIDUAL_ENABLED=True
+    ACCOUNT_ROTH=your_uuid_2
+    ACCOUNT_ROTH_ENABLED=True
+    ACCOUNT_TRAD=your_uuid_3
+    ACCOUNT_TRAD_ENABLED=False
+    ALPACA_KEY=your_alpaca_key
+    ALPACA_SECRET=your_alpaca_secret
+    DISCORD_WEBHOOK_URL=your_discord_webhook
+    LIVE_EXECUTION=False
+    EXECUTION_START_TIME=09:31
 ```
 
-4. **Initialize the Database:**
-The bot uses SQLite databases for state management and optimization persistence. Ensure the script has read/write permissions in its directory so it can automatically manage `alphabot_state.db` and `optuna_studies.db`.
-5. **Run the Application:**
-Start the Flask server and background scheduler by running:
-
-```
+4. **Initialize & Run**
+Launch the configuration server and background schedule loop by executing:
+```bash
 python app.py
 
 ```
 
-Navigate to the local server address (`http://127.0.0.1:5000`) in your browser to view the interactive live dashboard, view per-symphony logs, and configure settings.
 
-*Disclaimer: AlphaBot is an automated execution tool. Algorithmic trading carries significant risk. Always test parameters in Dry Run mode before enabling `LIVE_EXECUTION`.*
+Open your browser to `[http://127.0.0.1:5000](http://127.0.0.1:5000)` to access the live dashboard panel[cite: 16]. Use **"Force Run Now"** to instantly map portfolio positions followed by **"Create EOD Analysis"** to build your initial optimized 7-variable baseline sets[cite: 17, 25].
+
