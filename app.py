@@ -61,7 +61,7 @@ def threaded_trigger():
     
     # Bypass standard triggers during the critical EOD generation window (15:52 - 16:05)
     # This prevents regular executions from colliding with Stage 2 and EOD lockups
-    if dt_time(15, 52) <= current_time <= dt_time(16, 5):
+    if dt_time(15, 53) <= current_time <= dt_time(16, 0):
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Standing by during EOD blackout window...", flush=True)
         return
         

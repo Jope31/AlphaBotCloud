@@ -751,6 +751,30 @@ def main():
                         "breakeven_locked": False,
                         "hwm_hold_ticks": 0,
                     }
+
+                # --- ROBUST STATE VALIDATION FALLBACK ---
+                state = bot_state[symphony_id]
+                state.setdefault("name", symphony_name)
+                state.setdefault("account", account)
+                state.setdefault("high_water_mark", -999.0)
+                state.setdefault("shadow_hwm", -999.0)
+                state.setdefault("highest_stop_level", -999.0)
+                state.setdefault("prev_return", None)
+                state.setdefault("armed", False)
+                state.setdefault("tp_armed", False)
+                state.setdefault("para_armed", False)
+                state.setdefault("breakeven_locked", False)
+                state.setdefault("lowest_mc_seen", 100.0)
+                state.setdefault("lock_engaged_ticks", 0)
+                state.setdefault("below_lock_count", 0)
+                state.setdefault("below_stop_count", 0)
+                state.setdefault("above_tp_count", 0)
+                state.setdefault("vwap_ticks", 0)
+                state.setdefault("hwm_hold_ticks", 0)
+                state.setdefault("mc_history", [])
+                state.setdefault("lock_engaged_at", None)
+                state.setdefault("triggered", False)
+                state.setdefault("stop_hit_type", None)
                 
                 # Unconditionally inject identity mapping for the autotuner and cross-referencing
                 bot_state[symphony_id]["account"] = account
@@ -1074,6 +1098,7 @@ def main():
 
         # --- GHOST SYMPHONY SHADOW CHART FIX ---
         # Process triggered symphonies that have been dropped from the Composer API payload
+        active_symphony_ids = {sym["id"] for syms in symphony_data_cache.values() for sym in syms}
         for s_id, s_data in bot_state.items():
             if isinstance(s_data, dict) and s_data.get("triggered") and s_id not in active_symphony_ids:
                 

@@ -289,8 +289,8 @@ def calculate_active_stop_distance(safe_vol, dynamic_multiplier, dynamic_min_sto
         distance *= max_para_squeeze
     return float(distance)
 
-def check_breakeven_activation(current_return, symphony_vol):
-    dynamic_activation = max(0.4, min(3.0, symphony_vol))
+def check_breakeven_activation(current_return, symphony_vol, breakeven_vol_min=0.4, breakeven_vol_max=3.0):
+    dynamic_activation = max(breakeven_vol_min, min(breakeven_vol_max, symphony_vol))
     return current_return >= (dynamic_activation - BREAKEVEN_ACTIVATION_BUFFER)
 
 

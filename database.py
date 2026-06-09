@@ -12,22 +12,11 @@ DEFAULT_STRATEGY = {
     "TRIGGER_THRESHOLD_PCT": 15.0,
     "TAKE_PROFIT_MC_PCT": 5.0,
     "VWAP_CROSS_HWM_PCT": 1.0,
+    "VWAP_BAND_MULTIPLIER": 0.10,
     "VOLATILITY_MAGNITUDE_MULTIPLIER": 1.5,
     "VOLATILITY_CLOSE_MULTIPLIER": 0.5,
     "PARABOLIC_VELOCITY_THRESHOLD": 2.0,
-    "MAX_PARABOLIC_SQUEEZE": 0.50,
-    "GAP_DEFENSE_THRESHOLD_PCT": 2.5, # Retained for global UI matching baseline but no-op in loop
-    "GAP_DEFENSE_MULTIPLIER": 0.5,
-    "BREAKEVEN_VOL_MIN": 0.4,
-    "BREAKEVEN_VOL_MAX": 3.0,
-    "CATASTROPHIC_DROP_PCT": 0.75,
-    "VWAP_BAND_MULTIPLIER": 0.10,
-    "VWAP_BLEED_MULTIPLIER": 1.5,
-    "VWAP_BLEED_TICKS": 10,
-    "VWAP_BLEED_DECAY_RATE": 60,
-    "MC_W1": 1.0,
-    "MC_W2": 1.0,
-    "MC_W3": 1.0
+    "MAX_PARABOLIC_SQUEEZE": 0.50
 }
 
 # By default, we lock the non-user-specified variables so BO only tunes the requested

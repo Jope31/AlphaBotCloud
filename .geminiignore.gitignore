@@ -1,0 +1,9 @@
+alphabot_state.json
+history_cache.json
+__pycache__/
+.env
+AlphaBotNext.bat
+alphabot_state.db
+cache/
+plots/
+optuna_studies.db

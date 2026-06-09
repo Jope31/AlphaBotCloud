@@ -1,13 +1,15 @@
-# Your keys:
-.env
-
-# Local Databases (Your personal strategy locks and bot state)
-alphabot_state.db
-optuna_studies.db
-
-# Caches and Post-Mortem Reports (Your personal daily returns)
-__pycache__/
-cache/
+alphabot_state.json
 history_cache.json
-symphony_logs.json
-post_mortem_*.json
+__pycache__/
+.env
+alphaBotNext.bat
+cache/
+optuna_studies.db
+optuna_studies.db-journal
+alphabot_state.db
+archive/
+optuna_studies_shared.db
+post_mortem*
+symphony_logs*
+Risk Guard.txt
+risk_guard.md
