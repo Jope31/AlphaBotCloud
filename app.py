@@ -61,9 +61,12 @@ def threaded_trigger():
     
     # Bypass standard triggers during the critical EOD generation window (15:52 - 16:05)
     # This prevents regular executions from colliding with Stage 2 and EOD lockups
+    # BUT Stage 1 needs to run at least once to create the post_mortem file!
     if dt_time(15, 53) <= current_time <= dt_time(16, 0):
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Standing by during EOD blackout window...", flush=True)
-        return
+        report_file = f"post_mortem_{current_et.strftime('%Y-%m-%d')}.json"
+        if os.path.exists(report_file):
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] Standing by during EOD blackout window...", flush=True)
+            return
         
     threading.Thread(target=trigger_alpha_bot, daemon=True).start()
 

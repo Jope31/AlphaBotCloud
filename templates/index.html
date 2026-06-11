@@ -1637,13 +1637,25 @@
                             // Robust regex to strip " FOR {Name}" until the end or ". Level:" or a period
                             msg = msg.replace(/ FOR (.*?)(?=\. Level:|$|\.)/i, '');
                             
-                            // Strip redundant symphony name from start
+                            const eType = (log.event_type || '').toUpperCase();
+                            if (eType) {
+                                let idx = msg.toUpperCase().indexOf(" " + eType);
+                                if (idx > 0) {
+                                    msg = msg.substring(idx + eType.length + 1).trim();
+                                } else if (msg.toUpperCase().startsWith(eType + " ")) {
+                                    msg = msg.substring(eType.length).trim();
+                                } else if (msg.toUpperCase().indexOf(eType) === 0) {
+                                    msg = msg.substring(eType.length).trim();
+                                }
+                            }
+                            
+                            // Strip redundant symphony name from start just in case
                             const safeSymName = symName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                             const nameRegex = new RegExp('^' + safeSymName + '\\s*\\|?\\s*', 'i');
                             msg = msg.replace(nameRegex, '').trim();
                             
                             // Extra safety check if name was embedded with an emoji or shield
-                            msg = msg.replace(/^(?:🛡️\s*)?(?:[A-Za-z0-9 ]+\s*\|\s*)?MORNING GAP/, 'MORNING GAP');
+                            msg = msg.replace(/^(?:🛡️\s*)?(?:[A-Za-z0-9 \-]+\s*\|\s*)?MORNING GAP/i, 'MORNING GAP');
                             return `
                                 <div class="mb-2 last:mb-0 border-l-2 border-primary/30 pl-2 py-0.5">
                                     <span class="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">${log.timestamp || '--:--'}</span>

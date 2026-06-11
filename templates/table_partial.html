@@ -40,22 +40,22 @@
                         <th class="px-4 py-3 cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors group select-none" onclick="setSort('name')">
                             Symphony Name <span class="inline-block ml-1 transition-opacity opacity-{{ '100 text-primary' if sort_col == 'name' else '0 group-hover:opacity-50' }}">{{ '↓' if sort_dir == 'desc' and sort_col == 'name' else '↑' }}</span>
                         </th>
-                        <th class="px-4 py-3 text-right cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors group select-none" onclick="setSort('mc_prob')">
+                        <th class="px-2 py-3 text-right cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors group select-none" onclick="setSort('mc_prob')">
                             MC Prob <span class="inline-block ml-1 transition-opacity opacity-{{ '100 text-primary' if sort_col == 'mc_prob' else '0 group-hover:opacity-50' }}">{{ '↓' if sort_dir == 'desc' and sort_col == 'mc_prob' else '↑' }}</span>
                         </th>
-                        <th class="px-4 py-3 text-center cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors group select-none" onclick="setSort('status')">
+                        <th class="px-2 py-3 text-center cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors group select-none" onclick="setSort('status')">
                             Status <span class="inline-block ml-1 transition-opacity opacity-{{ '100 text-primary' if sort_col == 'status' else '0 group-hover:opacity-50' }}">{{ '↓' if sort_dir == 'desc' and sort_col == 'status' else '↑' }}</span>
                         </th>
-                        <th class="px-4 py-3 text-right cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors group select-none" onclick="setSort('stop_level')">
+                        <th class="px-2 py-3 text-right cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors group select-none" onclick="setSort('stop_level')">
                             Stop Level <span class="inline-block ml-1 transition-opacity opacity-{{ '100 text-primary' if sort_col == 'stop_level' else '0 group-hover:opacity-50' }}">{{ '↓' if sort_dir == 'desc' and sort_col == 'stop_level' else '↑' }}</span>
                         </th>
-                        <th class="px-4 py-3 text-right cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors group select-none" onclick="setSort('current_return')">
+                        <th class="px-2 py-3 text-right cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors group select-none" onclick="setSort('current_return')">
                             Exit Return <span class="inline-block ml-1 transition-opacity opacity-{{ '100 text-primary' if sort_col == 'current_return' else '0 group-hover:opacity-50' }}">{{ '↓' if sort_dir == 'desc' and sort_col == 'current_return' else '↑' }}</span>
                         </th>
-                        <th class="px-4 py-3 text-right cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors group select-none" onclick="setSort('high_water_mark')">
+                        <th class="px-2 py-3 text-right cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors group select-none" onclick="setSort('high_water_mark')">
                             High Water Mark <span class="inline-block ml-1 transition-opacity opacity-{{ '100 text-primary' if sort_col == 'high_water_mark' else '0 group-hover:opacity-50' }}">{{ '↓' if sort_dir == 'desc' and sort_col == 'high_water_mark' else '↑' }}</span>
                         </th>
-                        <th class="px-4 py-3 text-right cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors group select-none" title="The current live return of the symphony model. Shows what you would have if the bot didn't trigger." onclick="setSort('shadow')">
+                        <th class="px-2 py-3 text-right cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors group select-none" title="The current live return of the symphony model. Shows what you would have if the bot didn't trigger." onclick="setSort('shadow')">
                             If Held (Shadow) <span class="inline-block ml-1 transition-opacity opacity-{{ '100 text-primary' if sort_col == 'shadow' else '0 group-hover:opacity-50' }}">{{ '↓' if sort_dir == 'desc' and sort_col == 'shadow' else '↑' }}</span>
                         </th>
                     </tr>
@@ -146,12 +146,12 @@
                                     <span class="group-hover:text-primary transition-colors text-left font-medium" title="{{ name }}">{{ name }}</span>
                                 </div>
                             </td>
-                            <td class="px-4 py-3 text-right font-mono {{ mc_color }}">{{ mc_prob }}</td>
-                            <td class="px-4 py-3 text-center">{{ status_badge | safe }}</td>
-                            <td class="px-4 py-3 text-right font-mono text-on-surface-variant/80">{{ stop_level_str | safe }}</td>
-                            <td class="px-4 py-3 text-right font-mono {{ cur_ret_color }}">{{ cur_ret_str | safe }}</td>
-                            <td class="px-4 py-3 text-right font-mono {{ hwm_color }}">{{ hwm_str | safe }}</td>
-                            <td class="px-4 py-3 text-right font-mono">{{ shadow_str | safe }}</td>
+                            <td class="px-2 py-3 text-right font-mono {{ mc_color }}">{{ mc_prob }}</td>
+                            <td class="px-2 py-3 text-center">{{ status_badge | safe }}</td>
+                            <td class="px-2 py-3 text-right font-mono text-on-surface-variant/80">{{ stop_level_str | safe }}</td>
+                            <td class="px-2 py-3 text-right font-mono {{ cur_ret_color }}">{{ cur_ret_str | safe }}</td>
+                            <td class="px-2 py-3 text-right font-mono {{ hwm_color }}">{{ hwm_str | safe }}</td>
+                            <td class="px-2 py-3 text-right font-mono">{{ shadow_str | safe }}</td>
                         </tr>
 
                         <!-- Accordion Row -->
