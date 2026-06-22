@@ -18,6 +18,9 @@ from dotenv import load_dotenv
 
 # Import our SQLite DB Manager
 import database
+
+import asyncio
+from aiohttp import web
 import math_engine
 import reporting
 import autotuner
@@ -1377,5 +1380,28 @@ def main():
     finally:
         database.release_lock()
 
+async def background_trading_task(app):
+    print("Background trading task started.", flush=True)
+    while True:
+        try:
+            # We run main() in a separate thread so it doesn't block the async event loop
+            await asyncio.to_thread(main)
+        except Exception as e:
+            print(f"Error in background trading task: {e}", flush=True)
+        # Sleep before next evaluation (e.g., 60 seconds)
+        await asyncio.sleep(60)
+
+async def health_check(request):
+    return web.Response(text="OK")
+
+async def trigger_run(request):
+    asyncio.create_task(asyncio.to_thread(main))
+    return web.Response(text="Triggered")
+
 if __name__ == "__main__":
-    main()
+    app = web.Application()
+    app.router.add_get('/', health_check)
+    app.router.add_get('/health', health_check)
+    app.router.add_post('/trigger', trigger_run)
+    app.on_startup.append(background_trading_task)
+    web.run_app(app, host="0.0.0.0", port=5002)
