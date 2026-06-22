@@ -1383,6 +1383,8 @@ def main():
 async def background_trading_task(app):
     print("Background trading task started.", flush=True)
     while True:
+        # Yield control immediately to allow web server to bind its port and initialize
+        await asyncio.sleep(0)
         try:
             # We run main() in a separate thread so it doesn't block the async event loop
             await asyncio.to_thread(main)
