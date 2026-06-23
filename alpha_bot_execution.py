@@ -1380,44 +1380,5 @@ def main():
     finally:
         database.release_lock()
 
-async def background_trading_task(app):
-    print("Background trading task started.", flush=True)
-    while True:
-        # Yield control immediately to allow web server to bind its port and initialize
-        await asyncio.sleep(0)
-        try:
-            # We run main() in a separate thread so it doesn't block the async event loop
-            await asyncio.to_thread(main)
-        except Exception as e:
-            print(f"Error in background trading task: {e}", flush=True)
-        # Sleep before next evaluation (e.g., 60 seconds)
-        await asyncio.sleep(60)
-
-async def health_check(request):
-    return web.Response(text="OK")
-
-async def trigger_run(request):
-    asyncio.create_task(asyncio.to_thread(main))
-    return web.Response(text="Triggered")
-
-async def main_lifecycle():
-    app = web.Application()
-    app.router.add_get('/', health_check)
-    app.router.add_get('/health', health_check)
-    app.router.add_post('/trigger', trigger_run)
-    
-    # Fire up the background trading loop as a completely independent, unblocked concurrent task
-    asyncio.create_task(background_trading_task(app))
-    
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', 5002)
-    await site.start()
-    print("🚀 AlphaBotDuo Network Port 5002 is fully open and listening!", flush=True)
-    
-    # Keep the main process alive infinitely
-    while True:
-        await asyncio.sleep(3600)
-
 if __name__ == "__main__":
-    asyncio.run(main_lifecycle())
+    main()
