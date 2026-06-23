@@ -810,4 +810,4 @@ if __name__ == "__main__":
     print("\nStarting Alpha Bot Control Center at http://localhost:5000\n", flush=True)
     
     # Disable use_reloader to ensure the background thread runs once and only once
-    app.run(port=5000, debug=False, use_reloader=False)
+    app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
