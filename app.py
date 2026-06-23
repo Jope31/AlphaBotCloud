@@ -92,6 +92,10 @@ def run_scheduler():
         time.sleep(1)
 
 # --- 2. Web Dashboard Routes ---
+@app.route("/health")
+def health_check():
+    return "OK", 200
+
 @app.route("/")
 def dashboard():
     return render_template("index.html")
