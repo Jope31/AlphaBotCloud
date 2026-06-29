@@ -1,4 +1,4 @@
-"""Core execution logic for Alpha Bot with SQLite State Management and EOD Autotuner."""
+"""Core execution logic for Alpha Bot with SQLite State Management."""
 
 import os
 import sys
@@ -667,24 +667,8 @@ def main():
                 for sym_id, data in chart_history.get("symphonies", {}).items():
                     database.save_chart_archive(current_date_str, sym_id, data)
 
-            # NEW: Execute Autotuner (Weekly on Fridays, or Manual Weekends/Force)
-            autotuner_changes = None
-            
-            # NEW: Filter down to only UI-Enabled Accounts for Autotuning
-            enabled_account_uuids = [uid for uid in ACCOUNT_UUIDS if ACCOUNT_ENABLED_MAP.get(uid)]
-            
-            if current_et.weekday() >= 4 or (force_run and current_et.weekday() >= 5): # 4=Fri, 5=Sat, 6=Sun
-                print(f"  -> {'Weekend/Force' if current_et.weekday() >= 5 else 'Friday'} Detected. Starting autotune...", flush=True)
-                autotuner_changes = autotuner.run_autotuner(bot_state, current_date_str, enabled_account_uuids, is_forced=force_run)
-                
-                if autotuner_changes:
-                    discord_webhook = os.getenv("DISCORD_WEBHOOK_URL", DISCORD_WEBHOOK_URL)
-                    reporting.send_eod_discord_post(current_date_str, f"post_mortem_{current_date_str}.json", autotuner_changes, discord_webhook)
-                else:
-                    reporting.send_eod_discord_post(current_date_str, f"post_mortem_{current_date_str}.json", None, DISCORD_WEBHOOK_URL)
-            else:
-                print(f"  -> Day is {current_et.strftime('%A')}. Skipping weekly autotune.", flush=True)
-                reporting.send_eod_discord_post(current_date_str, f"post_mortem_{current_date_str}.json", None, DISCORD_WEBHOOK_URL)
+            # Autotuner has been decoupled to Local GPU Forge. We just send the EOD Discord report.
+            reporting.send_eod_discord_post(current_date_str, f"post_mortem_{current_date_str}.json", [], DISCORD_WEBHOOK_URL)
 
             print("  -> EOD Post-Mortem complete. Ending execution for the day.", flush=True)
             return

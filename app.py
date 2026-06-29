@@ -282,15 +282,13 @@ def force_eod():
             try:
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] Forcing EOD Analysis for {prev_date_str}...", flush=True)
                 import reporting
-                import autotuner
                 import traceback
                 
                 reporting.generate_eod_snapshot(bot_state, prev_date_str, is_post_rebalance=False, discord_webhook_url=discord_webhook)
                 reporting.generate_eod_snapshot(bot_state, prev_date_str, is_post_rebalance=True, discord_webhook_url=discord_webhook)
-                autotuner_changes = autotuner.run_autotuner(bot_state, prev_date_str, enabled_uuids, is_forced=True)
                 
                 try:
-                    reporting.send_eod_discord_post(prev_date_str, f"post_mortem_{prev_date_str}.json", autotuner_changes, discord_webhook)
+                    reporting.send_eod_discord_post(prev_date_str, f"post_mortem_{prev_date_str}.json", [], discord_webhook)
                 except Exception as discord_err:
                     print(f"!!! [ERROR] Failed to send Discord EOD report: {discord_err}", flush=True)
                     traceback.print_exc()
