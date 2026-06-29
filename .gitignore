@@ -18,3 +18,4 @@ optuna_studies_shared*
 debug_dump.json
 *driveupload*
 tests/
+turso config set token.txt

@@ -1,9 +1,12 @@
-"""SQLite state management for AlphaBot with Account-Level Strategies."""
-
 import sqlite3
 import json
 import time
+import os
+import libsql_experimental as libsql
 from datetime import datetime
+from dotenv import load_dotenv
+
+load_dotenv()
 
 DB_FILE = "alphabot_state.db"
 
@@ -27,10 +30,17 @@ DEFAULT_LOCKED_VARS = [
 ]
 
 def get_connection():
-    conn = sqlite3.connect(DB_FILE, timeout=10.0)
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA synchronous=NORMAL;")
-    return conn
+    libsql_url = os.getenv("LIBSQL_URL")
+    libsql_auth_token = os.getenv("LIBSQL_AUTH_TOKEN")
+    
+    if libsql_url and libsql_auth_token:
+        conn = libsql.connect(database=libsql_url, auth_token=libsql_auth_token)
+        return conn
+    else:
+        conn = sqlite3.connect(DB_FILE, timeout=10.0)
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+        return conn
 
 def init_db():
     conn = get_connection()
@@ -315,9 +325,6 @@ def log_symphony_event(symphony_id, message, event_type="info", date_str=None):
             json.dump(logs, f)
     except Exception as e:
         print(f"Error saving symphony logs to {log_file}: {e}", flush=True)
-
-# Initialize tables on import
-init_db()
 
 def execute_system_flush(account_id):
     import alpha_bot_execution
