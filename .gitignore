@@ -19,3 +19,4 @@ debug_dump.json
 *driveupload*
 tests/
 turso config set token.txt
+Pulumi.prod.yaml

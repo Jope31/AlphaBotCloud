@@ -21,9 +21,9 @@ app = do.App("alpha-bot-app",
             do.AppSpecServiceArgs(
                 name="alpha-bot-service",
                 github=do.AppSpecServiceGithubArgs(
-                    repo="Jope31/AlphaBotDuo",
+                    repo="Jope31/AlphaBotCloud",
                     branch="main",
-                    deploy_on_push=False,
+                    deploy_on_push=True,
                 ),
                 run_command="python app.py",
                 http_port=5000,
